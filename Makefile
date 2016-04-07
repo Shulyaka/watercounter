@@ -1,10 +1,10 @@
-all: helloworld
+all: watercounter
 
-helloworld: main.o
-	$(CC) -o helloworld main.o
+watercounter: main.o
+	$(CC) -o watercounter main.o
 
 main.o: main.c
 	$(CC) -c main.c
 
 clean:
-	rm -rf *.o helloworld
+	rm -rf *.o watercounter
