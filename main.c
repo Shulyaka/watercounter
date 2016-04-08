@@ -93,6 +93,9 @@ void gpio_init(void)
 	int i;
 	struct sigaction sig;
 
+	if(!numcounter)
+		err(1, "Counters not initialized");
+
 	sprintf(tmpstr, "/sys/class/gpio/gpiochip%d/base", GPIO_CHIP);
 
 	if(!(file=fopen(tmpstr, "r")))
@@ -214,9 +217,14 @@ void counter_init(const char *dirp)
 	if((numcounter=scandir(dirp, &namelist, namefilter, alphasort))<0)
 		err(1, "scandir %s", dirp);
 
-	if(numcounter==0 || numcounter > MAXCOUNTER)
+	if(numcounter==0)
 	{
-		printf("Invalid counter count\n");
+		printf("No counters configured\n");
+		exit(1);
+	}
+	else if(numcounter > MAXCOUNTER)
+	{
+		printf("Counter limit exceeded\n");
 		exit(1);
 	}
 
@@ -276,8 +284,6 @@ int main(void)
 	sigaddset(&sigset, SIGINT);
 	sigprocmask(SIG_BLOCK, &sigset, NULL);
 
-	printf("Waiting for gpio...\n");
-
 	while(1)
 	{
 		sigwaitinfo(&sigset, &siginfo);
@@ -289,8 +295,6 @@ int main(void)
 	gpio_free();
 
 	counter_print();
-
-	printf("\nNormal exit\n");
 
 	return 0;
 }
