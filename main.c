@@ -34,6 +34,7 @@ void gpio_init(void)
 		counter[i]+=gpio_base;
 		if(fprintf(file, "%d", counter[i]) <= 0)
 			err(1, "Unable to export gpio %d", counter[i]);
+		fflush(file);
 	}
 
 	fclose(file);
