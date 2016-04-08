@@ -14,6 +14,8 @@
 #define GPIO_CHIP	0
 #define MAXCOUNTER	20
 
+#define THRESHOLD	3
+
 enum state
 {
 	lo=0,
@@ -25,7 +27,7 @@ struct counter
 {
 	int gpio;
 	unsigned long value;
-	enum state laststate;
+	enum state state;
 	time_t timestamp;
 	char filename[256];
 } counter[MAXCOUNTER];
@@ -33,9 +35,23 @@ struct counter
 int numcounter=0;
 int gpio_base;
 
+void counter_save(int i)
+{
+	FILE *file;
+
+	if(!(file=fopen(counter[i].filename, "w")))
+		err(1, "open %s", counter[i].filename);
+
+	if(fprintf(file, "%lu", counter[i].value)<=0)
+		err(1, "write %s", counter[i].filename);
+
+	fclose(file);
+}
+
 void counter_update(int gpio, enum state val)
 {
 	int i;
+	time_t curtime=time(NULL);
 
 	printf("gpio: %d, state: %d\n", gpio, val);
 
@@ -47,14 +63,21 @@ void counter_update(int gpio, enum state val)
 		return;
 	}
 
-	if(val==hi)
+	if(val==hi && (curtime-counter[i].timestamp>=THRESHOLD))
 	{
 		counter[i].value++;
 		printf("counter: %d, value: %lu\n", i, counter[i].value);
+		counter_save(i);
+	}
+	else if(val==lo && (curtime-counter[i].timestamp<THRESHOLD))
+	{
+		counter[i].value--;
+		printf("counter: %d, value: %lu\n", i, counter[i].value);
+		counter_save(i);
 	}
 
-	counter[i].timestamp=time(NULL);
-	counter[i].laststate=val;
+	counter[i].timestamp=curtime;
+	counter[i].state=val;
 }
 
 void irq_handler(int n, siginfo_t *info, void *unused)
@@ -185,6 +208,7 @@ void counter_init(const char *dirp)
 	struct stat filestat;
 	FILE *file;
 	int i;
+	time_t curtime=time(NULL);
 
 	if((numcounter=scandir(dirp, &namelist, namefilter, alphasort))<0)
 		err(1, "scandir %s", dirp);
@@ -205,8 +229,13 @@ void counter_init(const char *dirp)
 			err(1, "stat %s", counter[i].filename);
 
 		counter[i].timestamp=filestat.st_mtim.tv_sec;
+		if(counter[i].timestamp>curtime)
+		{
+			printf("Warning: %s: file modification time is in future\n");
+			counter[i].timestamp=curtime;
+		}
 
-		counter[i].laststate=unknown;
+		counter[i].state=unknown;
 
 		if(!(file=fopen(counter[i].filename, "r")))
 			err(1, "open %s", counter[i].filename);
@@ -222,23 +251,6 @@ void counter_init(const char *dirp)
 	free(namelist);
 }
 
-void counter_free(void)
-{
-	FILE *file;
-	int i;
-
-	for(i=0; i<numcounter; i++)
-	{
-		if(!(file=fopen(counter[i].filename, "w")))
-			err(1, "open %s", counter[i].filename);
-
-		if(fprintf(file, "%lu", counter[i].value)<=0)
-			err(1, "write %s", counter[i].filename);
-
-		fclose(file);
-	}
-}
-
 void counter_print(void)
 {
 	int i;
@@ -246,7 +258,7 @@ void counter_print(void)
 	printf("Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		printf("Number: %d, gpio: %d, value: %lu, state: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].laststate, counter[i].timestamp, counter[i].filename);
+		printf("Number: %d, gpio: %d, value: %lu, state: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].timestamp, counter[i].filename);
 }
 
 int main(void)
@@ -276,7 +288,6 @@ int main(void)
 	gpio_free();
 
 	counter_print();
-	counter_free();
 
 	printf("\nNormal exit\n");
 
