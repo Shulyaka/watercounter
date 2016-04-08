@@ -11,9 +11,15 @@
 
 int counter[NUMCOUNTER]={0, 1, 24};
 
+void counter_update(int gpio, int value)
+{
+	printf("gpio: %d, value: %d\n", gpio, value);
+}
+
 void irq_handler(int n, siginfo_t *info, void *unused)
 {
 	printf("Received value 0x%X\n", info->si_int);
+	counter_update(info->si_int >> 24, info->si_int & 1);
 }
 
 void gpio_init(void)
@@ -33,8 +39,6 @@ void gpio_init(void)
 		err(1, "Unable to read %s", tmpstr);
 
 	fclose(file);
-
-	printf("gpio base is %d\n", gpio_base);
 
 /*
 	if(!(file=fopen("/sys/class/gpio/export", "w")))
@@ -82,11 +86,12 @@ void gpio_init(void)
 	for(i=0; i<NUMCOUNTER; i++)
 	{
 		counter[i]+=gpio_base;
-		if(fprintf(file, "+ %d %d", counter[i], getpid()) <= 0)
+		if(fprintf(file, "+ %d %d\n", counter[i], getpid()) <= 0)
 			err(1, "Unable to register irq handler for gpio %d", counter[i]);
 		fflush(file);
 	}
 
+	fprintf(file, "?\n", counter[i], getpid());
 	fclose(file);
 
 }
@@ -147,10 +152,7 @@ int main(void)
 		sigwaitinfo(&sigset, &siginfo);
 
 		if(siginfo.si_signo == SIGINT)
-		{
-			printf("Received SIGINT\n");
 			break;
-		}
 	}
 
 	gpio_free();
