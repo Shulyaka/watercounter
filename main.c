@@ -14,7 +14,8 @@
 #define GPIO_CHIP	0
 #define MAXCOUNTER	20
 
-#define THRESHOLD	3
+#define THRESHOLDLOHI	4
+#define THRESHOLDHILO	2
 
 enum state
 {
@@ -63,13 +64,13 @@ void counter_update(int gpio, enum state val)
 		return;
 	}
 
-	if(val==hi && (curtime-counter[i].timestamp>=THRESHOLD))
+	if(val==hi && (curtime-counter[i].timestamp>=THRESHOLDLOHI))
 	{
 		counter[i].value++;
 		printf("counter: %d, value: %lu\n", i, counter[i].value);
 		counter_save(i);
 	}
-	else if(val==lo && (curtime-counter[i].timestamp<THRESHOLD))
+	else if(val==lo && (curtime-counter[i].timestamp<THRESHOLDHILO))
 	{
 		counter[i].value--;
 		printf("counter: %d, value: %lu\n", i, counter[i].value);
