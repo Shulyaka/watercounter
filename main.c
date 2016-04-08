@@ -3,22 +3,52 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 
 #define SIG_GPIO_IRQ	42
 
 #define GPIO_CHIP	0
 #define NUMCOUNTER	3
 
-int counter[NUMCOUNTER]={0, 1, 24};
-
-void counter_update(int gpio, int value)
+enum state
 {
-	printf("gpio: %d, value: %d\n", gpio, value);
+	lo=0,
+	hi=1
+};
+
+struct counter
+{
+	int gpio;
+	unsigned long value;
+	enum state laststate;
+	time_t timestamp;
+} counter[NUMCOUNTER]={{0}, {1}, {24}};
+
+void counter_update(int gpio, enum state val)
+{
+	int i;
+
+	printf("gpio: %d, state: %d\n", gpio, val);
+
+	for(i=0; i<NUMCOUNTER && counter[i].gpio!=gpio; i++);
+
+	if(i==NUMCOUNTER)
+	{
+		printf("Warning: Unknown gpio pin %d\n", gpio);
+		return;
+	}
+
+	if(val==hi)
+		counter[i].value++;
+
+	counter[i].timestamp=time(NULL);
+	counter[i].laststate=val;
+
+	printf("counter: %d, value: %lu\n", i, counter[i].value);
 }
 
 void irq_handler(int n, siginfo_t *info, void *unused)
 {
-	printf("Received value 0x%X\n", info->si_int);
 	counter_update(info->si_int >> 24, info->si_int & 1);
 }
 
@@ -46,9 +76,9 @@ void gpio_init(void)
 
 	for(i=0; i<NUMCOUNTER; i++)
 	{
-		counter[i]+=gpio_base;
-		if(fprintf(file, "%d", counter[i]) <= 0)
-			err(1, "Unable to export gpio %d", counter[i]);
+		counter[i].gpio+=gpio_base;
+		if(fprintf(file, "%d", counter[i].gpio) <= 0)
+			err(1, "Unable to export gpio %d", counter[i].gpio);
 		fflush(file);
 	}
 
@@ -56,19 +86,19 @@ void gpio_init(void)
 
 	for(i=0; i<NUMCOUNTER; i++)
 	{
-		sprintf(tmpstr, "/sys/class/gpio/gpio%d/direction", counter[i]);
+		sprintf(tmpstr, "/sys/class/gpio/gpio%d/direction", counter[i].gpio);
 		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "in")<=0)
-			err(1, "Unable to set gpio %d direction", counter[i]);
+			err(1, "Unable to set gpio %d direction", counter[i].gpio);
 		fclose(file);
 
-		sprintf(tmpstr, "/sys/class/gpio/gpio%d/active_low", counter[i]);
+		sprintf(tmpstr, "/sys/class/gpio/gpio%d/active_low", counter[i].gpio);
 		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "0")<=0)
-			err(1, "Unable to set gpio %d active_low setting", counter[i]);
+			err(1, "Unable to set gpio %d active_low setting", counter[i].gpio);
 		fclose(file);
 
-		sprintf(tmpstr, "/sys/class/gpio/gpio%d/edge", counter[i]);
+		sprintf(tmpstr, "/sys/class/gpio/gpio%d/edge", counter[i].gpio);
 		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "both")<=0)
-			err(1, "Unable to set gpio %d edge setting", counter[i]);
+			err(1, "Unable to set gpio %d edge setting", counter[i].gpio);
 		fclose(file);
 	}
 */
@@ -78,20 +108,18 @@ void gpio_init(void)
 	if(sigaction(SIG_GPIO_IRQ, &sig, NULL)<0)
 		err(1, "Unable to set interrupt handler");
 
-	printf("PID is %d\n", getpid());
-
 	if(!(file=fopen("/sys/kernel/debug/gpio-irq", "w")))
 		err(1, "Unable to open /sys/kernel/debug/gpio-irq");
 
 	for(i=0; i<NUMCOUNTER; i++)
 	{
-		counter[i]+=gpio_base;
-		if(fprintf(file, "+ %d %d\n", counter[i], getpid()) <= 0)
-			err(1, "Unable to register irq handler for gpio %d", counter[i]);
+		counter[i].gpio+=gpio_base;
+		if(fprintf(file, "+ %d %d\n", counter[i].gpio, getpid()) <= 0)
+			err(1, "Unable to register irq handler for gpio %d", counter[i].gpio);
 		fflush(file);
 	}
 
-	fprintf(file, "?\n", counter[i], getpid());
+	fprintf(file, "?\n", counter[i].gpio, getpid());
 	fclose(file);
 
 }
@@ -108,10 +136,11 @@ void gpio_free(void)
 
 	for(i=0; i<NUMCOUNTER; i++)
 	{
-		if(fprintf(file, "- %d %d", counter[i], getpid()) <= 0)
-			err(1, "Unable to clear irq handler for gpio %d", counter[i]);
+		if(fprintf(file, "- %d %d\n", counter[i].gpio, getpid()) <= 0)
+			err(1, "Unable to clear irq handler for gpio %d", counter[i].gpio);
 		fflush(file);
 	}
+	fprintf(file, "?\n", counter[i].gpio, getpid());
 
 	fclose(file);
 
@@ -125,8 +154,8 @@ void gpio_free(void)
 
 	for(i=0; i<NUMCOUNTER; i++)
 	{
-		if(fprintf(file, "%d", counter[i]) <= 0)
-			err(1, "Unable to unexport gpio %d", counter[i]);
+		if(fprintf(file, "%d", counter[i].gpio) <= 0)
+			err(1, "Unable to unexport gpio %d", counter[i].gpio);
 		fflush(file);
 	}
 
