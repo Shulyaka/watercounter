@@ -2,11 +2,19 @@
 #include <err.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
-#define GPIO_CHIP 0
-#define NUMCOUNTER 3
+#define SIG_GPIO_IRQ	42
+
+#define GPIO_CHIP	0
+#define NUMCOUNTER	3
 
 int counter[NUMCOUNTER]={0, 1, 24};
+
+void irq_handler(int n, siginfo_t *info, void *unused)
+{
+	printf("Received value 0x%X\n", info->si_int);
+}
 
 void gpio_init(void)
 {
@@ -14,6 +22,7 @@ void gpio_init(void)
 	char tmpstr[256];
 	int gpio_base;
 	int i;
+	struct sigaction sig;
 
 	sprintf(tmpstr, "/sys/class/gpio/gpiochip%d/base", GPIO_CHIP);
 
@@ -59,6 +68,12 @@ void gpio_init(void)
 		fclose(file);
 	}
 */
+
+	sig.sa_sigaction=irq_handler;
+	sig.sa_flags = SA_SIGINFO;
+	if(sigaction(SIG_GPIO_IRQ, &sig, NULL)<0)
+		err(1, "Unable to set interrupt handler");
+
 	printf("PID is %d\n", getpid());
 
 	if(!(file=fopen("/sys/kernel/debug/gpio-irq", "w")))
@@ -68,7 +83,7 @@ void gpio_init(void)
 	{
 		counter[i]+=gpio_base;
 		if(fprintf(file, "+ %d %d", counter[i], getpid()) <= 0)
-			err(1, "Unable to register handler for gpio %d", counter[i]);
+			err(1, "Unable to register irq handler for gpio %d", counter[i]);
 		fflush(file);
 	}
 
@@ -81,6 +96,7 @@ void gpio_free(void)
 	FILE *file;
 	char tmpstr[256];
 	int i;
+	struct sigaction sig;
 
 	if(!(file=fopen("/sys/kernel/debug/gpio-irq", "w")))
 		err(1, "Unable to open /sys/kernel/debug/gpio-irq");
@@ -88,11 +104,16 @@ void gpio_free(void)
 	for(i=0; i<NUMCOUNTER; i++)
 	{
 		if(fprintf(file, "- %d %d", counter[i], getpid()) <= 0)
-			err(1, "Unable to register handler for gpio %d", counter[i]);
+			err(1, "Unable to clear irq handler for gpio %d", counter[i]);
 		fflush(file);
 	}
 
 	fclose(file);
+
+	sig.sa_handler=SIG_DFL;
+	sig.sa_flags = SA_SIGINFO | SA_NODEFER;
+	if(sigaction(SIG_GPIO_IRQ, &sig, NULL)<0)
+		err(1, "Unable to clear interrupt handler");
 /*
 	if(!(file=fopen("/sys/class/gpio/unexport", "w")))
 		err(1, "Unable to open /sys/class/gpio/unexport");
@@ -112,7 +133,7 @@ int main(void)
 {
 	gpio_init();
 
-	sleep(5);
+	sleep(300);
 
 	gpio_free();
 
