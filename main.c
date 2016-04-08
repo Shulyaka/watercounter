@@ -1,6 +1,7 @@
 #include <stdio.h>
-#include <event2/event.h>
 #include <err.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #define GPIO_CHIP 0
 #define NUMCOUNTER 3
@@ -26,6 +27,7 @@ void gpio_init(void)
 
 	printf("gpio base is %d\n", gpio_base);
 
+/*
 	if(!(file=fopen("/sys/class/gpio/export", "w")))
 		err(1, "Unable to open /sys/class/gpio/export");
 
@@ -56,16 +58,63 @@ void gpio_init(void)
 			err(1, "Unable to set gpio %d edge setting", counter[i]);
 		fclose(file);
 	}
+*/
+	printf("PID is %d\n", getpid());
+
+	if(!(file=fopen("/sys/kernel/debug/gpio-irq", "w")))
+		err(1, "Unable to open /sys/kernel/debug/gpio-irq");
+
+	for(i=0; i<NUMCOUNTER; i++)
+	{
+		counter[i]+=gpio_base;
+		if(fprintf(file, "+ %d %d", counter[i], getpid()) <= 0)
+			err(1, "Unable to register handler for gpio %d", counter[i]);
+		fflush(file);
+	}
+
+	fclose(file);
+
 }
-	
+
+void gpio_free(void)
+{
+	FILE *file;
+	char tmpstr[256];
+	int i;
+
+	if(!(file=fopen("/sys/kernel/debug/gpio-irq", "w")))
+		err(1, "Unable to open /sys/kernel/debug/gpio-irq");
+
+	for(i=0; i<NUMCOUNTER; i++)
+	{
+		if(fprintf(file, "- %d %d", counter[i], getpid()) <= 0)
+			err(1, "Unable to register handler for gpio %d", counter[i]);
+		fflush(file);
+	}
+
+	fclose(file);
+/*
+	if(!(file=fopen("/sys/class/gpio/unexport", "w")))
+		err(1, "Unable to open /sys/class/gpio/unexport");
+
+	for(i=0; i<NUMCOUNTER; i++)
+	{
+		if(fprintf(file, "%d", counter[i]) <= 0)
+			err(1, "Unable to unexport gpio %d", counter[i]);
+		fflush(file);
+	}
+
+	fclose(file);
+*/
+}
 
 int main(void)
 {
-	struct event_base *evbase=event_base_new();
-
 	gpio_init();
 
+	sleep(5);
 
-	event_base_free(evbase);		
+	gpio_free();
+
 	return 0;
 }

@@ -1,7 +1,7 @@
 all: watercounter
 
 watercounter: main.o
-	$(CC) -o watercounter main.o $(LDFLAGS) -l event_core
+	$(CC) -o watercounter main.o $(LDFLAGS)
 
 main.o: main.c
 	$(CC) -c main.c $(CFLAGS)
