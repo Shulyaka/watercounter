@@ -131,11 +131,31 @@ void gpio_free(void)
 
 int main(void)
 {
+	sigset_t sigset;
+	siginfo_t siginfo;
+
 	gpio_init();
 
-	sleep(300);
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGINT);
+	sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+	printf("Waiting for gpio...\n");
+
+	while(1)
+	{
+		sigwaitinfo(&sigset, &siginfo);
+
+		if(siginfo.si_signo == SIGINT)
+		{
+			printf("Received SIGINT\n");
+			break;
+		}
+	}
 
 	gpio_free();
+
+	printf("\nNormal exit\n");
 
 	return 0;
 }
