@@ -30,10 +30,31 @@ void gpio_init(void)
 		err(1, "Unable to open /sys/class/gpio/export");
 
 	for(i=0; i<NUMCOUNTER; i++)
-		if(fprintf(file, "%d", gpio_base + counter[i]) <= 0)
+	{
+		counter[i]+=gpio_base;
+		if(fprintf(file, "%d", counter[i]) <= 0)
 			err(1, "Unable to export gpio %d", counter[i]);
+	}
 
 	fclose(file);
+
+	for(i=0; i<NUMCOUNTER; i++)
+	{
+		sprintf(tmpstr, "/sys/class/gpio/gpio%d/direction", counter[i]);
+		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "in")<=0)
+			err(1, "Unable to set gpio %d direction", counter[i]);
+		fclose(file);
+
+		sprintf(tmpstr, "/sys/class/gpio/gpio%d/active_low", counter[i]);
+		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "0")<=0)
+			err(1, "Unable to set gpio %d active_low setting", counter[i]);
+		fclose(file);
+
+		sprintf(tmpstr, "/sys/class/gpio/gpio%d/edge", counter[i]);
+		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "both")<=0)
+			err(1, "Unable to set gpio %d edge setting", counter[i]);
+		fclose(file);
+	}
 }
 	
 
