@@ -31,6 +31,7 @@ struct counter
 	enum state state;
 	time_t timestamp;
 	char filename[256];
+	int rollback;
 } counter[MAXCOUNTER];
 
 int numcounter=0;
@@ -64,21 +65,35 @@ void counter_update(int gpio, enum state val)
 		return;
 	}
 
-	if(val==hi && (curtime-counter[i].timestamp>=THRESHOLDLOHI))
+	counter[i].state=val;
+	counter[i].timestamp=curtime;
+
+	if(val==hi && (curtime-counter[i].timestamp>=THRESHOLDLOHI) && counter[i].rollback==1)
 	{
 		counter[i].value++;
 		printf("counter: %d, value: %lu\n", i, counter[i].value);
 		counter_save(i);
+		counter[i].rollback=0;
 	}
-	else if(val==lo && (curtime-counter[i].timestamp<THRESHOLDHILO))
+	else if(val==hi)
+	{
+		if(counter[i].rollback==0)
+			counter[i].timestamp-=THRESHOLDHILO;
+		counter[i].rollback=1;
+	}
+	else if(val==lo && (curtime-counter[i].timestamp>=THRESHOLDHILO) && counter[i].rollback==1)
+	{
+		counter[i].rollback=0;
+	}
+	else
 	{
 		counter[i].value--;
 		printf("counter: %d, value: %lu\n", i, counter[i].value);
 		counter_save(i);
+		if(counter[i].rollback==0)
+			counter[i].timestamp-=THRESHOLDLOHI;
+		counter[i].rollback=1;
 	}
-
-	counter[i].timestamp=curtime;
-	counter[i].state=val;
 }
 
 void irq_handler(int n, siginfo_t *info, void *unused)
@@ -245,6 +260,7 @@ void counter_init(const char *dirp)
 		}
 
 		counter[i].state=unknown;
+		counter[i].rollback=0;
 
 		if(!(file=fopen(counter[i].filename, "r")))
 			err(1, "open %s", counter[i].filename);
@@ -267,7 +283,7 @@ void counter_print(void)
 	printf("Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		printf("Number: %d, gpio: %d, value: %lu, state: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].timestamp, counter[i].filename);
+		printf("Number: %d, gpio: %d, value: %lu, state: %d, rollback: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].rollback, counter[i].timestamp, counter[i].filename);
 }
 
 int main(void)
