@@ -17,6 +17,8 @@
 #define THRESHOLDLOHI	4
 #define THRESHOLDHILO	2
 
+#define DEFLOGDIR "/etc/watercounter"
+
 enum state
 {
 	lo=0,
@@ -33,6 +35,7 @@ struct counter
 	char filename[256];
 	int rollback;
 	int thresholdbypass;
+	time_t lastsave;
 } counter[MAXCOUNTER];
 
 int numcounter=0;
@@ -41,14 +44,38 @@ int gpio_base;
 void counter_save(int i)
 {
 	FILE *file;
+	time_t curtime=time(NULL);
+	static char *hostname=NULL;
+
+	if(!hostname)
+	{
+		hostname=getenv("COLLECTD_HOSTNAME");
+		if(!hostname)
+			hostname==getenv("HOSTNAME");
+		if(!hostname)
+			hostname="localhost";
+	}
+
+	fprintf(stderr, "counter: %d, value: %lu\n", i, counter[i].value);
+	fflush(stderr);
 
 	if(!(file=fopen(counter[i].filename, "w")))
 		err(1, "open %s", counter[i].filename);
 
-	if(fprintf(file, "%lu", counter[i].value)<=0)
+	if(fprintf(file, "%lu\n", counter[i].value)<=0)
 		err(1, "write %s", counter[i].filename);
 
 	fclose(file);
+
+	fprintf(stderr, "PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%d\n", hostname, i, curtime-counter[i].lastsave, curtime, counter[i].value);
+	fprintf(stderr, "PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.2f\n", hostname, i, curtime-counter[i].lastsave, curtime, 0.01*counter[i].value);
+	fflush(stderr);
+
+	printf("PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%d\n", hostname, i, curtime-counter[i].lastsave, curtime, counter[i].value);
+	printf("PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.2f\n", hostname, i, curtime-counter[i].lastsave, curtime, 0.01*counter[i].value);
+	fflush(stdout);
+
+	counter[i].lastsave=curtime;
 }
 
 void counter_update(int gpio, enum state val)
@@ -56,17 +83,19 @@ void counter_update(int gpio, enum state val)
 	int i;
 	time_t curtime=time(NULL);
 
-	printf("gpio: %d, state: %d", gpio, val);
+	fprintf(stderr, "gpio: %d, state: %d", gpio, val);
 
 	for(i=0; i<numcounter && counter[i].gpio!=gpio; i++);
 
 	if(i==numcounter)
 	{
-		printf("\nWarning: Unknown gpio pin %d\n", gpio);
+		fprintf(stderr, "\nWarning: Unknown gpio pin %d\n", gpio);
+		fflush(stderr);
 		return;
 	}
 
-	printf(" time: %ld, rollback: %d, bypass: %d\n", curtime-counter[i].timestamp, counter[i].rollback, counter[i].thresholdbypass);
+	fprintf(stderr, " time: %ld, rollback: %d, bypass: %d\n", curtime-counter[i].timestamp, counter[i].rollback, counter[i].thresholdbypass);
+	fflush(stderr);
 
 	counter[i].state=val;
 
@@ -77,7 +106,6 @@ void counter_update(int gpio, enum state val)
 			if(counter[i].rollback==0)
 			{
 				counter[i].value++;
-				printf("counter: %d, value: %lu\n", i, counter[i].value);
 				counter_save(i);
 			}
 			counter[i].rollback=0;
@@ -101,9 +129,6 @@ void counter_update(int gpio, enum state val)
 		}
 		else
 		{
-			//counter[i].value--;
-			//printf("counter: %d, value: %lu\n", i, counter[i].value);
-			//counter_save(i);
 			if(counter[i].rollback==0)
 				counter[i].thresholdbypass=1;
 			else
@@ -253,12 +278,12 @@ void counter_init(const char *dirp)
 
 	if(numcounter==0)
 	{
-		printf("No counters configured\n");
+		fprintf(stderr, "No counters configured\n");
 		exit(1);
 	}
 	else if(numcounter > MAXCOUNTER)
 	{
-		printf("Counter limit exceeded\n");
+		fprintf(stderr, "Counter limit exceeded\n");
 		exit(1);
 	}
 
@@ -274,10 +299,12 @@ void counter_init(const char *dirp)
 		counter[i].timestamp=filestat.st_mtim.tv_sec;
 		if(counter[i].timestamp>curtime)
 		{
-			printf("Warning: %s: file modification time is in future\n");
+			fprintf(stderr, "Warning: %s: file modification time is in future\n");
+			fflush(stderr);
 			counter[i].timestamp=curtime;
 		}
 
+		counter[i].lastsave=counter[i].timestamp;
 		counter[i].state=unknown;
 		counter[i].rollback=0;
 		counter[i].thresholdbypass=0;
@@ -300,31 +327,33 @@ void counter_print(void)
 {
 	int i;
 
-	printf("Current counters:\n");
+	fprintf(stderr, "Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		printf("Number: %d, gpio: %d, value: %lu, state: %d, rollback: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].rollback, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
+		fprintf(stderr, "Number: %d, gpio: %d, value: %lu, state: %d, rollback: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].rollback, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
+	fflush(stderr);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 	sigset_t sigset;
 	siginfo_t siginfo;
 
-	counter_init("/root/watercounters");
+	counter_init(argc>1?argv[1]:DEFLOGDIR);
 	counter_print();
 
 	gpio_init();
 
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGINT);
+	sigaddset(&sigset, SIGTERM);
 	sigprocmask(SIG_BLOCK, &sigset, NULL);
 
 	while(1)
 	{
 		sigwaitinfo(&sigset, &siginfo);
 
-		if(siginfo.si_signo == SIGINT)
+		if(siginfo.si_signo == SIGINT || siginfo.si_signo == SIGTERM)
 			break;
 	}
 
@@ -334,3 +363,4 @@ int main(void)
 
 	return 0;
 }
+
