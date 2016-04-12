@@ -17,25 +17,26 @@
 #define THRESHOLDLOHI	4
 #define THRESHOLDHILO	2
 
-#define DEFLOGDIR "/etc/watercounter"
+#define CONFIGDIR "/etc/watercounter"
+
+int debug=1;
 
 enum state
 {
 	lo=0,
-	hi=1,
-	unknown
+	hi=1
 };
 
 struct counter
 {
 	int gpio;
-	unsigned long value;
+	unsigned long value; //litres
 	enum state state;
-	time_t timestamp;
+	time_t timestamp; //last state change
 	char filename[256];
-	int rollback;
-	int thresholdbypass;
-	time_t lastsave;
+	int rollback; //whether we have detected a chatter after last value update, so we should ignore the following state change
+	int thresholdbypass; //whether we should not treat next state change as chatter even if it happens shortly after, means we had already waited enough before the chatter happened
+	time_t lastsave; //last save of the value
 } counter[MAXCOUNTER];
 
 int numcounter=0;
@@ -56,8 +57,11 @@ void counter_save(int i)
 			hostname="localhost";
 	}
 
-	fprintf(stderr, "counter: %d, value: %lu\n", i, counter[i].value);
-	fflush(stderr);
+	if(debug)
+	{
+		fprintf(stderr, "counter: %d, value: %lu\n", i, counter[i].value);
+		fflush(stderr);
+	}
 
 	if(!(file=fopen(counter[i].filename, "w")))
 		err(1, "open %s", counter[i].filename);
@@ -67,12 +71,15 @@ void counter_save(int i)
 
 	fclose(file);
 
-	fprintf(stderr, "PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%d\n", hostname, i, curtime-counter[i].lastsave, curtime, counter[i].value);
-	fprintf(stderr, "PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.2f\n", hostname, i, curtime-counter[i].lastsave, curtime, 0.01*counter[i].value);
-	fflush(stderr);
+	if(debug)
+	{
+		fprintf(stderr, "PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%lu\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, counter[i].value);
+		fprintf(stderr, "PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.3f\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, 0.001*counter[i].value);
+		fflush(stderr);
+	}
 
-	printf("PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%d\n", hostname, i, curtime-counter[i].lastsave, curtime, counter[i].value);
-	printf("PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.2f\n", hostname, i, curtime-counter[i].lastsave, curtime, 0.01*counter[i].value);
+	printf("PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%lu\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, counter[i].value);
+	printf("PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.3f\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, 0.001*counter[i].value);
 	fflush(stdout);
 
 	counter[i].lastsave=curtime;
@@ -83,7 +90,8 @@ void counter_update(int gpio, enum state val)
 	int i;
 	time_t curtime=time(NULL);
 
-	fprintf(stderr, "gpio: %d, state: %d", gpio, val);
+	if(debug)
+		fprintf(stderr, "gpio: %d, state: %d", gpio, val);
 
 	for(i=0; i<numcounter && counter[i].gpio!=gpio; i++);
 
@@ -94,8 +102,11 @@ void counter_update(int gpio, enum state val)
 		return;
 	}
 
-	fprintf(stderr, " time: %ld, rollback: %d, bypass: %d\n", curtime-counter[i].timestamp, counter[i].rollback, counter[i].thresholdbypass);
-	fflush(stderr);
+	if(debug)
+	{
+		fprintf(stderr, " time: %ld, rollback: %d, bypass: %d\n", curtime-counter[i].timestamp, counter[i].rollback, counter[i].thresholdbypass);
+		fflush(stderr);
+	}
 
 	counter[i].state=val;
 
@@ -105,7 +116,7 @@ void counter_update(int gpio, enum state val)
 		{
 			if(counter[i].rollback==0)
 			{
-				counter[i].value++;
+				counter[i].value+=7;
 				counter_save(i);
 			}
 			counter[i].rollback=0;
@@ -118,12 +129,27 @@ void counter_update(int gpio, enum state val)
 			else
 				counter[i].thresholdbypass=0;
 			counter[i].rollback=1;
+
+			if(curtime!=counter[i].timestamp) //We detect that we are still on edge between hi and lo states after some time, thus report zero usage. Very rare case.
+			{
+				if(debug)
+				{
+					fprintf(stderr, "Zero rate detected\n");
+					fflush(stderr);
+				}
+				counter_save(i);
+			}
 		}
 	}
 	else
 	{
 		if(curtime-counter[i].timestamp>=THRESHOLDHILO || counter[i].thresholdbypass)
 		{
+			if(counter[i].rollback==0)
+			{
+				counter[i].value+=3;
+				counter_save(i);
+			}
 			counter[i].rollback=0;
 			counter[i].thresholdbypass=0;
 		}
@@ -134,6 +160,16 @@ void counter_update(int gpio, enum state val)
 			else
 				counter[i].thresholdbypass=0;
 			counter[i].rollback=1;
+
+			if(curtime!=counter[i].timestamp)
+			{
+				if(debug)
+				{
+					fprintf(stderr, "Zero rate detected\n");
+					fflush(stderr);
+				}
+				counter_save(i);
+			}
 		}
 	}
 
@@ -272,6 +308,7 @@ void counter_init(const char *dirp)
 	FILE *file;
 	int i;
 	time_t curtime=time(NULL);
+	unsigned char lastdigit;
 
 	if((numcounter=scandir(dirp, &namelist, namefilter, alphasort))<0)
 		err(1, "scandir %s", dirp);
@@ -305,7 +342,6 @@ void counter_init(const char *dirp)
 		}
 
 		counter[i].lastsave=counter[i].timestamp;
-		counter[i].state=unknown;
 		counter[i].rollback=0;
 		counter[i].thresholdbypass=0;
 
@@ -318,6 +354,13 @@ void counter_init(const char *dirp)
 		fclose(file);
 
 		free(namelist[i]);
+
+		lastdigit=counter[i].value-counter[i].value/10*10;
+
+		if(lastdigit > 1 && lastdigit < 8)
+			counter[i].state=lo;
+		else
+			counter[i].state=hi;
 	}
 
 	free(namelist);
@@ -339,8 +382,9 @@ int main(int argc, char **argv)
 	sigset_t sigset;
 	siginfo_t siginfo;
 
-	counter_init(argc>1?argv[1]:DEFLOGDIR);
-	counter_print();
+	counter_init(argc>1?argv[1]:CONFIGDIR);
+	if(debug)
+		counter_print();
 
 	gpio_init();
 
@@ -359,7 +403,8 @@ int main(int argc, char **argv)
 
 	gpio_free();
 
-	counter_print();
+	if(debug)
+		counter_print();
 
 	return 0;
 }
