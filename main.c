@@ -9,6 +9,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+// https://github.com/unwireddevices/gpio-irq-handler
+
 #define SIG_GPIO_IRQ	42
 
 #define GPIO_CHIP	0
@@ -20,6 +22,7 @@
 #define CONFIGDIR "/etc/watercounter"
 
 int debug=1;
+int lesswrites=1;
 
 enum state
 {
@@ -42,10 +45,9 @@ struct counter
 int numcounter=0;
 int gpio_base;
 
-void counter_save(int i)
+void counter_save(int i, time_t curtime, int writefile)
 {
 	FILE *file;
-	time_t curtime=time(NULL);
 	static char *hostname=NULL;
 
 	if(!hostname)
@@ -63,13 +65,16 @@ void counter_save(int i)
 		fflush(stderr);
 	}
 
-	if(!(file=fopen(counter[i].filename, "w")))
-		err(1, "open %s", counter[i].filename);
+	if(writefile)
+	{
+		if(!(file=fopen(counter[i].filename, "w")))
+			err(1, "open %s", counter[i].filename);
 
-	if(fprintf(file, "%lu\n", counter[i].value)<=0)
-		err(1, "write %s", counter[i].filename);
+		if(fprintf(file, "%lu\n", counter[i].value)<=0)
+			err(1, "write %s", counter[i].filename);
 
-	fclose(file);
+		fclose(file);
+	}
 
 	if(debug)
 	{
@@ -83,6 +88,16 @@ void counter_save(int i)
 	fflush(stdout);
 
 	counter[i].lastsave=curtime;
+}
+
+void counter_free(void)
+{
+	time_t curtime=time(NULL);
+	int i;
+
+	if(lesswrites)
+		for(i=0; i<numcounter; i++)
+			counter_save(i, curtime, 1);
 }
 
 void counter_update(int gpio, enum state val)
@@ -117,7 +132,7 @@ void counter_update(int gpio, enum state val)
 			if(counter[i].rollback==0)
 			{
 				counter[i].value+=7;
-				counter_save(i);
+				counter_save(i, curtime, !lesswrites);
 			}
 			counter[i].rollback=0;
 			counter[i].thresholdbypass=0;
@@ -129,16 +144,6 @@ void counter_update(int gpio, enum state val)
 			else
 				counter[i].thresholdbypass=0;
 			counter[i].rollback=1;
-
-			if(curtime!=counter[i].timestamp) //We detect that we are still on edge between hi and lo states after some time, thus report zero usage. Very rare case.
-			{
-				if(debug)
-				{
-					fprintf(stderr, "Zero rate detected\n");
-					fflush(stderr);
-				}
-				counter_save(i);
-			}
 		}
 	}
 	else
@@ -148,7 +153,7 @@ void counter_update(int gpio, enum state val)
 			if(counter[i].rollback==0)
 			{
 				counter[i].value+=3;
-				counter_save(i);
+				counter_save(i, curtime, !lesswrites);
 			}
 			counter[i].rollback=0;
 			counter[i].thresholdbypass=0;
@@ -160,16 +165,6 @@ void counter_update(int gpio, enum state val)
 			else
 				counter[i].thresholdbypass=0;
 			counter[i].rollback=1;
-
-			if(curtime!=counter[i].timestamp)
-			{
-				if(debug)
-				{
-					fprintf(stderr, "Zero rate detected\n");
-					fflush(stderr);
-				}
-				counter_save(i);
-			}
 		}
 	}
 
@@ -405,6 +400,8 @@ int main(int argc, char **argv)
 
 	if(debug)
 		counter_print();
+
+	counter_free();
 
 	return 0;
 }
