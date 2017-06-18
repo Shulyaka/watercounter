@@ -196,38 +196,6 @@ void gpio_init(void)
 
 	fclose(file);
 
-/*
-	if(!(file=fopen("/sys/class/gpio/export", "w")))
-		err(1, "Unable to open /sys/class/gpio/export");
-
-	for(i=0; i<NUMCOUNTER; i++)
-	{
-		counter[i].gpio+=gpio_base;
-		if(fprintf(file, "%d", counter[i].gpio) <= 0)
-			err(1, "Unable to export gpio %d", counter[i].gpio);
-		fflush(file);
-	}
-
-	fclose(file);
-
-	for(i=0; i<NUMCOUNTER; i++)
-	{
-		sprintf(tmpstr, "/sys/class/gpio/gpio%d/direction", counter[i].gpio);
-		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "in")<=0)
-			err(1, "Unable to set gpio %d direction", counter[i].gpio);
-		fclose(file);
-
-		sprintf(tmpstr, "/sys/class/gpio/gpio%d/active_low", counter[i].gpio);
-		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "0")<=0)
-			err(1, "Unable to set gpio %d active_low setting", counter[i].gpio);
-		fclose(file);
-
-		sprintf(tmpstr, "/sys/class/gpio/gpio%d/edge", counter[i].gpio);
-		if(!(file=fopen(tmpstr, "w")) || fprintf(file, "both")<=0)
-			err(1, "Unable to set gpio %d edge setting", counter[i].gpio);
-		fclose(file);
-	}
-*/
 
 	sig.sa_sigaction=irq_handler;
 	sig.sa_flags = SA_SIGINFO;
@@ -245,7 +213,7 @@ void gpio_init(void)
 		fflush(file);
 	}
 
-	fprintf(file, "?\n", counter[i].gpio, getpid());
+	fprintf(file, "?\n");
 	fclose(file);
 
 }
@@ -266,7 +234,7 @@ void gpio_free(void)
 			err(1, "Unable to clear irq handler for gpio %d", counter[i].gpio);
 		fflush(file);
 	}
-	fprintf(file, "?\n", counter[i].gpio, getpid());
+	fprintf(file, "?\n");
 
 	fclose(file);
 
@@ -274,19 +242,6 @@ void gpio_free(void)
 	sig.sa_flags = SA_SIGINFO | SA_NODEFER;
 	if(sigaction(SIG_GPIO_IRQ, &sig, NULL)<0)
 		err(1, "Unable to clear interrupt handler");
-/*
-	if(!(file=fopen("/sys/class/gpio/unexport", "w")))
-		err(1, "Unable to open /sys/class/gpio/unexport");
-
-	for(i=0; i<NUMCOUNTER; i++)
-	{
-		if(fprintf(file, "%d", counter[i].gpio) <= 0)
-			err(1, "Unable to unexport gpio %d", counter[i].gpio);
-		fflush(file);
-	}
-
-	fclose(file);
-*/
 }
 
 int namefilter(const struct dirent *de)
