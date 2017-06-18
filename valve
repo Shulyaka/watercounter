@@ -1,0 +1,51 @@
+#!/bin/sh
+
+GPIO_CTRL="$1"
+GPIO_STATE="$2"
+FUNCTION="$3"
+
+TIMEOUT=16
+PIDFILE="/var/run/valve$GPIO_CTRL.pid"
+
+cleanup() {
+	STATUS=$?
+        trap '' SIGINT SIGHUP SIGQUIT SIGTERM EXIT
+
+	echo "0" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+	test -f "$PIDFILE" -a "$(cat "$PIDFILE")" == "$$" && rm "$PIDFILE"
+
+        exit $STATUS
+}
+
+test -f "$PIDFILE" && kill "$(cat "$PIDFILE")"
+
+trap cleanup SIGINT SIGHUP SIGQUIT SIGTERM EXIT                        
+
+echo "$$" > "$PIDFILE"
+
+test ! -d "/sys/class/gpio/gpio$GPIO_CTRL" && echo "$GPIO_CTRL" > /sys/class/gpio/export
+test ! -d "/sys/class/gpio/gpio$GPIO_STATE" && echo "$GPIO_STATE" > /sys/class/gpio/export
+
+echo "out" > "/sys/class/gpio/gpio$GPIO_CTRL/direction"
+echo "out" > "/sys/class/gpio/gpio$GPIO_STATE/direction"
+
+case "$FUNCTION" in
+	"open")
+		echo "0" > "/sys/class/gpio/gpio$GPIO_STATE/value"
+		echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+		sleep $TIMEOUT &
+		wait $!
+
+		;;
+	"close")
+		echo "1" > "/sys/class/gpio/gpio$GPIO_STATE/value"
+		echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+		sleep $TIMEOUT &
+		wait $!
+
+		;;
+	*)
+		echo "$0: Unknown function $FUNCTION" >&2
+		;;
+esac
+
