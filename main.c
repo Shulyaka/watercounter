@@ -16,8 +16,8 @@
 #define GPIO_CHIP	0
 #define MAXCOUNTER	20
 
-#define THRESHOLDLOHI	4
-#define THRESHOLDHILO	2
+#define THRESHOLDLOHI	4 //The threshold is the minimum time in seconds that could physically pass between the two states
+#define THRESHOLDHILO	2 //Everything below that limit is considered as chatter
 
 #define CONFIGDIR "/etc/watercounter"
 
@@ -37,8 +37,7 @@ struct counter
 	enum state state;
 	time_t timestamp; //last state change
 	char filename[256];
-	int rollback; //whether we have detected a chatter after last value update, so we should ignore the following state change
-	int thresholdbypass; //whether we should not treat next state change as chatter even if it happens shortly after, means we had already waited enough before the chatter happened
+	int thresholdbypass; //whether we have detected a chatter after last value update, so we should ignore the following state change and ignore the threshold as we had already waited enough
 	time_t lastsave; //last save of the value
 } counter[MAXCOUNTER];
 
@@ -74,13 +73,6 @@ void counter_save(int i, time_t curtime, int writefile)
 			err(1, "write %s", counter[i].filename);
 
 		fclose(file);
-	}
-
-	if(debug)
-	{
-		fprintf(stderr, "PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%lu\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, counter[i].value);
-		fprintf(stderr, "PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.3f\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, 0.001*counter[i].value);
-		fflush(stderr);
 	}
 
 	printf("PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%lu\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, counter[i].value);
@@ -119,7 +111,7 @@ void counter_update(int gpio, enum state val)
 
 	if(debug)
 	{
-		fprintf(stderr, " time: %ld, rollback: %d, bypass: %d\n", curtime-counter[i].timestamp, counter[i].rollback, counter[i].thresholdbypass);
+		fprintf(stderr, " time: %ld, bypass: %d\n", curtime-counter[i].timestamp, counter[i].thresholdbypass);
 		fflush(stderr);
 	}
 
@@ -129,43 +121,29 @@ void counter_update(int gpio, enum state val)
 	{
 		if(curtime-counter[i].timestamp>=THRESHOLDLOHI || counter[i].thresholdbypass)
 		{
-			if(counter[i].rollback==0)
+			if(counter[i].thresholdbypass==0)
 			{
 				counter[i].value+=7;
 				counter_save(i, curtime, !lesswrites);
 			}
-			counter[i].rollback=0;
 			counter[i].thresholdbypass=0;
 		}
-		else
-		{
-			if(counter[i].rollback==0)
-				counter[i].thresholdbypass=1;
-			else
-				counter[i].thresholdbypass=0;
-			counter[i].rollback=1;
-		}
+		else	//ignoring event because of rate limit, the water could not flow that fast; it is a way to filter out the chatter
+			counter[i].thresholdbypass=1;		//ignore the threshold next time as we had already waited enough previously
 	}
 	else
 	{
 		if(curtime-counter[i].timestamp>=THRESHOLDHILO || counter[i].thresholdbypass)
 		{
-			if(counter[i].rollback==0)
+			if(counter[i].thresholdbypass==0)
 			{
 				counter[i].value+=3;
 				counter_save(i, curtime, !lesswrites);
 			}
-			counter[i].rollback=0;
 			counter[i].thresholdbypass=0;
 		}
 		else
-		{
-			if(counter[i].rollback==0)
-				counter[i].thresholdbypass=1;
-			else
-				counter[i].thresholdbypass=0;
-			counter[i].rollback=1;
-		}
+			counter[i].thresholdbypass=1;
 	}
 
 	counter[i].timestamp=curtime;
@@ -246,7 +224,8 @@ void gpio_free(void)
 
 int namefilter(const struct dirent *de)
 {
-	if(strncmp(de->d_name, "counter", 7))
+	int l=strlen(de->d_name);
+	if(l<8 || strncmp(de->d_name, "counter", 7) || strstr(de->d_name+7, "-opkg"))
 		return 0;
 	return de->d_name[7]>='0' && de->d_name[7]<='9' && (de->d_type==DT_LNK || de->d_type==DT_REG || de->d_type==DT_UNKNOWN);
 }
@@ -292,7 +271,6 @@ void counter_init(const char *dirp)
 		}
 
 		counter[i].lastsave=counter[i].timestamp;
-		counter[i].rollback=0;
 		counter[i].thresholdbypass=0;
 
 		if(!(file=fopen(counter[i].filename, "r")))
@@ -323,7 +301,7 @@ void counter_print(void)
 	fprintf(stderr, "Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		fprintf(stderr, "Number: %d, gpio: %d, value: %lu, state: %d, rollback: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].rollback, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
+		fprintf(stderr, "Number: %d, gpio: %d, value: %lu, state: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
 	fflush(stderr);
 }
 
