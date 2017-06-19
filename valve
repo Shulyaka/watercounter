@@ -6,6 +6,9 @@ FUNCTION="$3"
 
 TIMEOUT=16
 PIDFILE="/var/run/valve$GPIO_CTRL.pid"
+STATEFILE="/tmp/valve$GPIO_CTRL.state"
+
+test -f "$STATEFILE" && STATE=$(cat "$STATEFILE")
 
 cleanup() {
 	STATUS=$?
@@ -17,31 +20,51 @@ cleanup() {
         exit $STATUS
 }
 
-test -f "$PIDFILE" && kill "$(cat "$PIDFILE")"
+init() {
+	test -f "$PIDFILE" && kill "$(cat "$PIDFILE")"
 
-trap cleanup SIGINT SIGHUP SIGQUIT SIGTERM EXIT                        
+	trap cleanup SIGINT SIGHUP SIGQUIT SIGTERM EXIT
 
-echo "$$" > "$PIDFILE"
+	echo "$$" > "$PIDFILE"
 
-test ! -d "/sys/class/gpio/gpio$GPIO_CTRL" && echo "$GPIO_CTRL" > /sys/class/gpio/export
-test ! -d "/sys/class/gpio/gpio$GPIO_STATE" && echo "$GPIO_STATE" > /sys/class/gpio/export
+	test ! -d "/sys/class/gpio/gpio$GPIO_CTRL" && echo "$GPIO_CTRL" > /sys/class/gpio/export
+	test ! -d "/sys/class/gpio/gpio$GPIO_STATE" && echo "$GPIO_STATE" > /sys/class/gpio/export
 
-echo "out" > "/sys/class/gpio/gpio$GPIO_CTRL/direction"
-echo "out" > "/sys/class/gpio/gpio$GPIO_STATE/direction"
+	echo "out" > "/sys/class/gpio/gpio$GPIO_CTRL/direction"
+	echo "out" > "/sys/class/gpio/gpio$GPIO_STATE/direction"
+}
 
 case "$FUNCTION" in
 	"open")
+		init
 		echo "0" > "/sys/class/gpio/gpio$GPIO_STATE/value"
 		echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
-		sleep $TIMEOUT &
-		wait $!
+		: ${STATE:=0}
+		for i in $(seq 1 $TIMEOUT); do
+			sleep 1 & wait $!
+			test "$((STATE++))" -ge "$TIMEOUT" && STATE="$TIMEOUT"
+			echo "$STATE" > "$STATEFILE"
+		done
 
 		;;
 	"close")
+		init
 		echo "1" > "/sys/class/gpio/gpio$GPIO_STATE/value"
 		echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
-		sleep $TIMEOUT &
-		wait $!
+		: ${STATE:=$TIMEOUT}
+		for i in $(seq 1 $TIMEOUT); do
+			sleep 1 & wait $!
+			test "$((STATE--))" -le "0" && STATE="0"
+			echo "$STATE" > "$STATEFILE"
+		done
+
+		;;
+	"abort")
+		init
+
+		;;
+	"state")
+		test -n "$STATE" && echo "$STATE"
 
 		;;
 	*)
