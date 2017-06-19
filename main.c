@@ -224,8 +224,7 @@ void gpio_free(void)
 
 int namefilter(const struct dirent *de)
 {
-	int l=strlen(de->d_name);
-	if(l<8 || strncmp(de->d_name, "counter", 7) || strstr(de->d_name+7, "-opkg"))
+	if(strlen(de->d_name)<8 || strncmp(de->d_name, "counter", 7) || strstr(de->d_name+7, "-opkg"))
 		return 0;
 	return de->d_name[7]>='0' && de->d_name[7]<='9' && (de->d_type==DT_LNK || de->d_type==DT_REG || de->d_type==DT_UNKNOWN);
 }
@@ -301,7 +300,7 @@ void counter_print(void)
 	fprintf(stderr, "Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		fprintf(stderr, "Number: %d, gpio: %d, value: %lu, state: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
+		fprintf(stderr, "Number: %d, gpio: %d, value: %lu, state: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
 	fflush(stderr);
 }
 
