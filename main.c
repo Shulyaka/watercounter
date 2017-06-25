@@ -263,7 +263,7 @@ void counter_init(const char *dirp)
 
 		counter[i].gpio=atoi(namelist[i]->d_name+7);
 
-		if((delim=strchr(namelist[i]->d_name+8)))
+		if((delim=strchr(namelist[i]->d_name+8, '_')))
 			strcpy(counter[i].name, delim+1);
 
 		if(!delim || !counter[i].name[0])
