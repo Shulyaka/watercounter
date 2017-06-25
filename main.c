@@ -36,9 +36,10 @@ struct counter
 	unsigned long value; //litres
 	enum state state;
 	time_t timestamp; //last state change
-	char filename[256];
+	char filename[PATH_MAX];
 	int thresholdbypass; //whether we have detected a chatter after last value update, so we should ignore the following state change and ignore the threshold as we had already waited enough
 	time_t lastsave; //last save of the value
+	char name[NAME_MAX];
 } counter[MAXCOUNTER];
 
 int numcounter=0;
@@ -60,7 +61,7 @@ void counter_save(int i, time_t curtime, int writefile)
 
 	if(debug)
 	{
-		fprintf(stderr, "counter: %d, value: %lu\n", i, counter[i].value);
+		fprintf(stderr, "counter: %s, value: %lu\n", counter[i].name, counter[i].value);
 		fflush(stderr);
 	}
 
@@ -75,8 +76,8 @@ void counter_save(int i, time_t curtime, int writefile)
 		fclose(file);
 	}
 
-	printf("PUTVAL %s/exec-watercounter/counter-%d interval=%ld %ld:%lu\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, counter[i].value);
-	printf("PUTVAL %s/exec-watercounter/gauge-%d interval=%ld %ld:%.3f\n", hostname, counter[i].gpio, curtime-counter[i].lastsave, curtime, 0.001*counter[i].value);
+	printf("PUTVAL %s/exec-watercounter/counter-%s interval=%ld %ld:%lu\n", hostname, counter[i].name, curtime-counter[i].lastsave, curtime, counter[i].value);
+	printf("PUTVAL %s/exec-watercounter/gauge-%s interval=%ld %ld:%.3f\n", hostname, counter[i].name, curtime-counter[i].lastsave, curtime, 0.001*counter[i].value);
 	fflush(stdout);
 
 	counter[i].lastsave=curtime;
@@ -222,6 +223,9 @@ void gpio_free(void)
 		err(1, "Unable to clear interrupt handler");
 }
 
+// The configuration file for every counter should be named with the following format:
+// /etc/watercounter/counter${GPIO}_${NAME}
+// where ${GPIO} is the gpio pin number and the ${NAME} is a human-readable name (may not end on "-opkg"). The name is optional.
 int namefilter(const struct dirent *de)
 {
 	if(strlen(de->d_name)<8 || strncmp(de->d_name, "counter", 7) || strstr(de->d_name+7, "-opkg"))
@@ -237,6 +241,7 @@ void counter_init(const char *dirp)
 	int i;
 	time_t curtime=time(NULL);
 	unsigned char lastdigit;
+	char *delim;
 
 	if((numcounter=scandir(dirp, &namelist, namefilter, alphasort))<0)
 		err(1, "scandir %s", dirp);
@@ -257,6 +262,12 @@ void counter_init(const char *dirp)
 		sprintf(counter[i].filename, "%s/%s", dirp, namelist[i]->d_name);
 
 		counter[i].gpio=atoi(namelist[i]->d_name+7);
+
+		if((delim=strchr(namelist[i]->d_name+8)))
+			strcpy(counter[i].name, delim+1);
+
+		if(!delim || !counter[i].name[0])
+			sprintf(counter[i].name, "%d", counter[i].gpio);
 
 		if(stat(counter[i].filename, &filestat)<0)
 			err(1, "stat %s", counter[i].filename);
