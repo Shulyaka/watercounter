@@ -37,9 +37,9 @@ struct counter
 	enum state state;
 	time_t timestamp; //last state change
 	char filename[PATH_MAX];
+	char name[NAME_MAX];
 	int thresholdbypass; //whether we have detected a chatter after last value update, so we should ignore the following state change and ignore the threshold as we had already waited enough
 	time_t lastsave; //last save of the value
-	char name[NAME_MAX];
 } counter[MAXCOUNTER];
 
 int numcounter=0;
@@ -226,6 +226,7 @@ void gpio_free(void)
 // The configuration file for every counter should be named with the following format:
 // /etc/watercounter/counter${GPIO}_${NAME}
 // where ${GPIO} is the gpio pin number and the ${NAME} is a human-readable name (may not end on "-opkg"). The name is optional.
+// If you are running the program as a collectd exec plugin, make sure the files are readable and writable by the user you've configured in the collectd settings for the plugin.
 int namefilter(const struct dirent *de)
 {
 	if(strlen(de->d_name)<8 || strncmp(de->d_name, "counter", 7) || strstr(de->d_name+7, "-opkg"))
@@ -311,14 +312,14 @@ void counter_print(void)
 	fprintf(stderr, "Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		fprintf(stderr, "Number: %d, gpio: %d, value: %lu, state: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].value, counter[i].state, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
+		fprintf(stderr, "Index: %d, gpio: %d, name: %s, value: %lu, state: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].name, counter[i].value, counter[i].state, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
 	fflush(stderr);
 }
 
 int main(int argc, char **argv)
 {
 	sigset_t sigset;
-	siginfo_t siginfo;
+	siginfo_t siginfo={0};
 
 	counter_init(argc>1?argv[1]:CONFIGDIR);
 	if(debug)
@@ -331,13 +332,8 @@ int main(int argc, char **argv)
 	sigaddset(&sigset, SIGTERM);
 	sigprocmask(SIG_BLOCK, &sigset, NULL);
 
-	while(1)
-	{
+	while(siginfo.si_signo != SIGINT && siginfo.si_signo != SIGTERM)
 		sigwaitinfo(&sigset, &siginfo);
-
-		if(siginfo.si_signo == SIGINT || siginfo.si_signo == SIGTERM)
-			break;
-	}
 
 	gpio_free();
 
