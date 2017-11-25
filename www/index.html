@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+    <head>
+		<title>Water counters</title>
+        <meta charset="utf-8">
+		<script src="/luci-static/resources/xhr.js"></script>
+<style type="text/css">
+   html {
+    height: 100%;
+    }
+   body {
+    height: 100%;
+    margin: 0px;
+    }
+   #counters {
+    min-height: 100%;
+    overflow: hidden;
+    }
+   .counter {
+    position: relative;
+    float: left;
+    width: 600px;
+    height: 750px;
+    }
+   .counter_body {
+    position: absolute;
+    width: 384px;
+    height: 384px;
+    top: 50px;
+    left: 110px;
+   }
+   .counter_cold {
+    background-image: url(img/counter-cold.png);
+   }
+   .counter_hot {
+    background-image: url(img/counter-hot.png);
+   }
+   .counter_body_top {
+    position: absolute;
+    width: 384px;
+    height: 97px;
+    top: 0px;
+    left: 0px;
+   }
+   .counter_top_cold {
+    background-image: url(img/counter-top-cold.png);
+   }
+   .counter_top_hot {
+    background-image: url(img/counter-top-hot.png);
+   }
+   .counter_body_bottom {
+    position: absolute;
+    width: 384px;
+    height: 255px;
+    top: 129px;
+    left: 0px;
+   }
+   .counter_bottom_cold {
+    background-image: url(img/counter-bottom-cold.png);
+   }
+   .counter_bottom_hot {
+    background-image: url(img/counter-bottom-hot.png);
+   }
+   .pipe_top {
+    position: absolute;
+    width: 171px;
+    height: 278px;
+    top: -265px;
+    left: 102px;
+    background-image: url(img/pipe_top.png);
+   }
+   .pipe_bottom {
+    position: absolute;
+    width: 171px;
+    height: 258px;
+    top: 367px;
+    left: 102px;
+    background-image: url(img/pipe_bottom.png);
+   }
+   .valve {
+    position: absolute;
+    width: 1096px;
+    height: 500px;
+    top: -100px;
+    left: -465px;
+    transform: scale(0.2);
+    background-image: url(img/valve.png);
+    transition: all 1s linear;
+    z-index: 1;
+   }
+   .value {
+    position: relative;
+   }
+   .digit {
+    position: absolute;
+    float: left;
+    font-size: 27px;
+    font-family: monospace;
+   }
+   .digit_curr {
+    top: 99px;
+   }
+   .digit_prevprev {
+    top: 149px;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+   }
+   .digit_prev {
+    top: 124px;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+   }
+   .digit_next {
+    top: 74px;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+   }
+   .digit0 {left: 86px;}
+   .digit1 {left: 113px;}
+   .digit2 {left: 140px;}
+   .digit3 {left: 168px;}
+   .digit4 {left: 195px;}
+   .digit5 {left: 222px;}
+   .digit6 {left: 249px;}
+   .digit7 {left: 276px;}
+   .serial {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    top: 45px;
+    font-family: sans-serif;
+    font-size: 30px;
+    font-weight: lighter;
+    background-color: transparent;
+    color: rgba(0, 0, 0, 0.1);
+    filter: blur(0.5px);
+   }
+   .stream {
+    position: absolute;
+    overflow: hidden;
+    top: 613px;
+   }
+   .stream1 {
+    left: 115px;
+    width: 140px;
+    height: 1233px;
+    background-image: url(img/stream1.png);
+   }
+   .stream2 {
+    left: 105px;
+    width: 145px;
+    height: 1235px;
+    background-image: url(img/stream2.png);
+   }
+   .stream3 {
+    left: 123px;
+    width: 112px;
+    height: 1218px;
+    background-image: url(img/stream3.png);
+   }
+   .stream4 {
+    left: 120px;
+    width: 137px;
+    height: 1214px;
+    background-image: url(img/stream4.png);
+   }
+   .stream5 {
+    left: 123px;
+    width: 110px;
+    height: 966px;
+    background-image: url(img/stream5.png);
+   }
+   #xhr_poll_status_off {
+    position: absolute;
+    width: 100%;
+    height: 900px;
+    background-image: url(img/water_on_glass_x3.png);
+   }
+  </style>
+    </head>
+    <body style="background-color: white; background-image: url(img/background.jpg);">
+<script type="text/javascript">//<![CDATA[
+	var counter = {};
+
+	function createDiv(name, par)
+	{
+		var div = document.createElement('div');
+		//div.id = par.id + name;
+		div.classList.add(name);
+		par.appendChild(div);
+		return div;
+	}
+
+	var stream_prevprev = 0;
+	var stream_prev = 0;
+	// Returns a random integer number in [1;5] range ensuring every 3 consecutive numbers are different
+	function getRandomStream()
+	{
+		var range=5; //number of stream samples
+
+		if(stream_prev != 0)
+			range--;
+
+		if(stream_prevprev != 0)
+			range--;
+
+		if(range <= 0)
+			return Math.floor(Math.random() * 5 + 1); //range too low, fallback to 1-5 random without previous number check
+
+		var stream_curr = Math.floor(Math.random() * range + 1);
+
+		while(stream_curr == stream_prev || stream_curr == stream_prevprev)
+			stream_curr++;
+
+		stream_prevprev = stream_prev;
+		stream_prev=stream_curr;
+		return stream_curr;
+	}
+
+	function createCounter(name)
+	{
+		counter[name] = {};
+		
+		counter[name].div = createDiv('counter', document.getElementById('counters'));
+
+		counter[name].body = createDiv('counter_body', counter[name].div);
+
+		counter[name].pipe_top = createDiv('pipe_top', counter[name].body);
+
+		counter[name].stream = createDiv('stream', counter[name].body);
+
+		counter[name].stream.classList.add('stream' + getRandomStream());
+		
+		counter[name].pipe_bottom = createDiv('pipe_bottom', counter[name].body);
+
+		counter[name].valve = createDiv('valve', counter[name].pipe_bottom);
+		counter[name].valve.style.display = 'none';
+		counter[name].valve.onclick = function () { toggleValve(name); };
+
+		counter[name].value = createDiv('value', counter[name].body);
+
+		counter[name].digit = {};
+		counter[name].digit_prev = {};
+		counter[name].digit_prevprev = {};
+		counter[name].digit_next = {};
+
+		var random_offset = {};
+		for (var i=0; i<8; i++)
+		{
+			counter[name].digit[i] = document.createElement('span');
+			counter[name].digit[i].classList.add('digit');
+			counter[name].digit[i].classList.add('digit_curr');
+			counter[name].digit[i].classList.add('digit' + i);
+			counter[name].value.appendChild(counter[name].digit[i]);
+			counter[name].digit[i].innerHTML = '0';
+
+			if (i==7)
+				random_offset[i] = Math.floor(Math.random() * 15 - 7);
+			else
+				random_offset[i] = Math.floor(Math.random() * 5 - 2);
+
+			counter[name].digit[i].style.top = parseInt(getComputedStyle(counter[name].digit[i]).getPropertyValue('top'), 10) + random_offset[i] + "px";
+
+			(function()
+			{
+				var number = i;
+				counter[name].digit[i].addEventListener("transitionend", function() {checkValue(name, number);});
+			}());
+		}
+
+		for (var i=0; i<8; i++)
+		{
+			counter[name].digit_prevprev[i] = document.createElement('span');
+			counter[name].digit_prevprev[i].classList.add('digit');
+			counter[name].digit_prevprev[i].classList.add('digit_prevprev');
+			counter[name].digit_prevprev[i].classList.add('digit' + i);
+			counter[name].value.appendChild(counter[name].digit_prevprev[i]);
+			counter[name].digit_prevprev[i].innerHTML = '8';
+			counter[name].digit_prevprev[i].style.top = parseInt(getComputedStyle(counter[name].digit_prevprev[i]).getPropertyValue('top'), 10) + random_offset[i] + "px";
+
+			counter[name].digit_prev[i] = document.createElement('span');
+			counter[name].digit_prev[i].classList.add('digit');
+			counter[name].digit_prev[i].classList.add('digit_prev');
+			counter[name].digit_prev[i].classList.add('digit' + i);
+			counter[name].value.appendChild(counter[name].digit_prev[i]);
+			counter[name].digit_prev[i].innerHTML = '9';
+			counter[name].digit_prev[i].style.top = parseInt(getComputedStyle(counter[name].digit_prev[i]).getPropertyValue('top'), 10) + random_offset[i] + "px";
+
+			counter[name].digit_next[i] = document.createElement('span');
+			counter[name].digit_next[i].classList.add('digit');
+			counter[name].digit_next[i].classList.add('digit_next');
+			counter[name].digit_next[i].classList.add('digit' + i);
+			counter[name].value.appendChild(counter[name].digit_next[i]);
+			counter[name].digit_next[i].innerHTML = '1';
+			counter[name].digit_next[i].style.top = parseInt(getComputedStyle(counter[name].digit_next[i]).getPropertyValue('top'), 10) + random_offset[i] + "px";
+		}
+
+		counter[name].body_top = createDiv('counter_body_top', counter[name].body);
+
+		counter[name].body_bottom = createDiv('counter_body_bottom', counter[name].body);
+
+		counter[name].serial = createDiv('serial', counter[name].body);
+
+		if(name.substr(0, 1).toUpperCase() == 'H')
+		{
+			counter[name].body.classList.add('counter_hot');
+			counter[name].body_top.classList.add('counter_top_hot');
+			counter[name].body_bottom.classList.add('counter_bottom_hot');
+		}
+		else
+		{
+			counter[name].body.classList.add('counter_cold');
+			counter[name].body_top.classList.add('counter_top_cold');
+			counter[name].body_bottom.classList.add('counter_bottom_cold');
+		}
+
+		counter[name].value_next = 0;
+		counter[name].value_curr = 0;
+		counter[name].transition_running = 0;
+		counter[name].transition_digit = 0;
+
+		return counter[name].div;
+	}
+
+	function destroyCounter(name)
+	{
+		document.getElementById('counters').removeChild(counter[name].div);
+	}
+
+	function updateText(obj, text)
+	{
+		if (obj.innerHTML != text)
+			obj.innerHTML = text;
+	}
+
+	// anim:
+	// 0: no animation
+	// 1: start animation
+	// 2: continue animation
+	// 3: stop animation
+	// 4: start and stop
+	// return:
+	// true: value updated
+	// false: No update needed
+	function updateDigit(name, number, value, anim)
+	{
+		if (counter[name].digit[number].innerHTML == value)
+			return false;
+
+		if(anim != 0)
+		{
+			counter[name].digit_prevprev[number].innerHTML = counter[name].digit_prev[number].innerHTML;
+			counter[name].digit_prev[number].innerHTML = counter[name].digit[number].innerHTML;
+		}
+		else
+		{
+			counter[name].digit_prevprev[number].innerHTML = value < 2 ? value + 8 : value - 2;
+			counter[name].digit_prev[number].innerHTML = value == 0 ? 9 : value - 1;
+		}
+		counter[name].digit[number].innerHTML = value;
+		counter[name].digit_next[number].innerHTML = value == 9 ? 0 : value + 1;
+
+		counter[name].digit_prevprev[number].style.transition = "top 0s";
+		counter[name].digit_prev[number].style.transition = "top 0s";
+		counter[name].digit[number].style.transition = "top 0s";
+		counter[name].digit_next[number].style.transition = "top 0s";
+
+		var prevprevtop = counter[name].digit_prevprev[number].style.top;
+		counter[name].digit_prevprev[number].style.top = counter[name].digit_prev[number].style.top;
+		counter[name].digit_prev[number].style.top = counter[name].digit[number].style.top;
+		counter[name].digit[number].style.top = counter[name].digit_next[number].style.top;
+		counter[name].digit_next[number].style.top = parseInt(counter[name].digit_next[number].style.top, 10) + parseInt(counter[name].digit[number].style.top, 10) - parseInt(counter[name].digit_prev[number].style.top, 10) + "px";
+
+		//force redraw
+		getComputedStyle(counter[name].digit_prevprev[number]).top;
+		getComputedStyle(counter[name].digit_prev[number]).top;
+		getComputedStyle(counter[name].digit[number]).top;
+		getComputedStyle(counter[name].digit_next[number]).top;
+
+		if(anim != 0)
+		{
+			var transition;
+			switch(anim)
+			{
+				case 1:
+					transition = "top 5s ease-in";
+					break;
+				case 2:
+					transition = "top 3s linear";
+					break;
+				case 3:
+					transition = "top 5s ease-out";
+					break;
+				default:
+					transition = "top 5s ease";
+			}
+
+			counter[name].digit_prevprev[number].style.transition = transition;
+			counter[name].digit_prev[number].style.transition = transition;
+			counter[name].digit[number].style.transition = transition;
+			counter[name].digit_next[number].style.transition = transition;
+
+			counter[name].transition_running = 1;
+		}
+
+		counter[name].digit_next[number].style.top = counter[name].digit[number].style.top;
+		counter[name].digit[number].style.top = counter[name].digit_prev[number].style.top;
+		counter[name].digit_prev[number].style.top = counter[name].digit_prevprev[number].style.top;
+		counter[name].digit_prevprev[number].style.top = prevprevtop;
+
+		return true;
+	}
+
+	function setValue(name, value, anim)
+	{
+		counter[name].value_curr = value;
+		counter[name].transition_digit = 0;
+
+		for (var i=0; i<8; i++)
+		{
+			if(updateDigit(name, 7-i, value - Math.floor(value/10)*10, anim) && counter[name].transition_digit == 0)
+				counter[name].transition_digit = 7-i;
+			value = Math.floor(value/10);
+		}
+	}
+
+	function checkValue(name, number)
+	{
+		if(counter[name].value_next == counter[name].value_curr)
+		{
+			counter[name].transition_running = 0;
+			return;
+		}
+
+		if (number != counter[name].transition_digit)
+			return;
+
+		if (counter[name].value_next - counter[name].value_curr == 1)
+			setValue(name, counter[name].value_next, 3);
+		else if (counter[name].value_next - counter[name].value_curr > 10 || counter[name].value_next < counter[name].value_curr)
+			setValue(name, counter[name].value_next - 1, 2);
+		else
+			setValue(name, counter[name].value_curr + 1, 2);
+	}
+
+	function updateValue(name, value)
+	{
+		if (counter[name].value_next == value)
+			return;
+
+		if (counter[name].transition_running == 1)
+		{
+			counter[name].value_next = value;
+			return;
+		}
+
+		counter[name].value_next = value;
+
+		if (counter[name].value_curr == 0)
+			setValue(name, value, 0);
+		else if (counter[name].value_next - counter[name].value_curr > 10 || counter[name].value_next - counter[name].value_curr == 1 || counter[name].value_next < counter[name].value_curr)
+			setValue(name, value - 1, 1);
+			//setValue(name, value, 4);
+		else
+			setValue(name, counter[name].value_curr + 1, 1);
+	}
+
+	function updateSerial(name, serial)
+	{
+		updateText(counter[name].serial, serial);
+	}
+
+	function updateState(name, state)
+	{
+		if (state == null)
+			counter[name].valve.style.display = 'none';
+		else
+		{
+			counter[name].valve.style.transform = 'scale(0.2) rotate(' + (state * 6) + 'deg)';
+			counter[name].valve.style.display = '';
+
+			if(counter[name].state !== undefined)
+			{
+				if (state > counter[name].state)
+					counter[name].lastaction = 1;
+				else if (state < counter[name].state)
+					counter[name].lastaction = 0;
+			}
+			else if (state == 0)
+				counter[name].lastaction = 0;
+			else
+				counter[name].lastaction = 1;
+
+			if (state == 0)
+				counter[name].stream.style.display = 'none';
+			else
+				counter[name].stream.style.display = '';
+
+			counter[name].state = state;
+		}
+
+	}
+
+	function checkResponse(x, result)
+	{
+		if(result.success != 1)
+			alert(result.error);
+	}
+
+	function toggleValve(name)
+	{
+		if(counter[name].lastaction === undefined || counter[name].lastaction == 1)
+			counter[name].lastaction = 0;
+		else
+			counter[name].lastaction = 1;
+		XHR.get('/cgi-bin/wcontrol.sh', { valve: name, function: counter[name].lastaction == 1 ? "open" : "close" }, checkResponse)
+	}
+
+	XHR.poll(1, '/cgi-bin/wcounter.sh', { status: 1 },
+		function(x, info)
+		{
+			if(info == null)
+			{
+				document.getElementById('xhr_poll_status_off').style.display = '';
+				return;
+			}
+
+			document.getElementById('xhr_poll_status_off').style.display = 'none';
+
+			for (var name in counter)
+				counter[name].updated=0;
+
+			for (var i = 0; i < info.counters.length; i++)
+			{
+				var name = info.counters[i].name;
+				if(counter[name] === undefined)
+					createCounter(name);
+				counter[name].updated=1;
+				updateValue(name, info.counters[i].value);
+				updateSerial(name, info.counters[i].serial);
+				updateState(name, info.counters[i].state);
+			}
+			for (var name in counter)
+				if(counter[name].updated==0)
+					destroyCounter(name);
+		}
+	);
+//]]></script>
+    	<div id="counters"></div>
+	<div id="xhr_poll_status"></div>
+	<div id="xhr_poll_status_on"></div>
+	<div id="xhr_poll_status_off"></div>
+    </body>
+</html>
+

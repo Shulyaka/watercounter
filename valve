@@ -4,7 +4,7 @@ GPIO_CTRL="$1"
 GPIO_STATE="$2"
 FUNCTION="$3"
 
-TIMEOUT=16
+TIMEOUT=15
 PIDFILE="/var/run/valve$GPIO_CTRL.pid"
 STATEFILE="/tmp/valve$GPIO_CTRL.state"
 
@@ -64,7 +64,7 @@ case "$FUNCTION" in
 
 		;;
 	"state")
-		test -n "$STATE" && echo "$STATE"
+		test -n "$STATE" && echo "$STATE" || echo "$TIMEOUT"
 
 		;;
 	*)

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ "$1" == "counter" ]; then
+	counter hot_16-046903 $@
+else
+	valve 15 13 $@
+fi

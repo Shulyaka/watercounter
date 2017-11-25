@@ -1,0 +1,28 @@
+#!/bin/sh
+
+NAME="$1"
+FUNCTION="$2"
+shift 2
+
+RRDDIR="/tmp/rrd/$(uname -n)/exec-watercounter"
+
+case "$FUNCTION" in
+	"counter")
+		if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
+			VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
+		fi
+
+		VALUE2="$(cat /etc/watercounter/counter*_${NAME})"
+
+		if [ -n "$VALUE1" -a "$VALUE1" != "UNKN" -a "$VALUE1" -gt "$VALUE2" ]; then
+			echo "$VALUE1"
+		else
+			echo "$VALUE2"
+		fi
+
+		;;
+	*)
+		echo "$0: Unknown function $FUNCTION" >&2
+		;;
+esac
+

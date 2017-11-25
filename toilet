@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ "$1" == "counter" ]; then
+	counter toilet_15-382336 $@
+else
+	valve 22 26 $@
+fi
