@@ -3,8 +3,10 @@
 GPIO_CTRL="$1"
 GPIO_STATE="$2"
 FUNCTION="$3"
+shift 3
 
-TIMEOUT=15
+STATELIMIT=15
+TIMEOUT=$(($STATELIMIT+1))
 PIDFILE="/var/run/valve$GPIO_CTRL.pid"
 STATEFILE="/tmp/valve$GPIO_CTRL.state"
 
@@ -41,8 +43,8 @@ case "$FUNCTION" in
 		echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
 		: ${STATE:=0}
 		for i in $(seq 1 $TIMEOUT); do
+			test "$((STATE++))" -ge "$STATELIMIT" && STATE="$STATELIMIT"
 			sleep 1 & wait $!
-			test "$((STATE++))" -ge "$TIMEOUT" && STATE="$TIMEOUT"
 			echo "$STATE" > "$STATEFILE"
 		done
 
@@ -53,8 +55,8 @@ case "$FUNCTION" in
 		echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
 		: ${STATE:=$TIMEOUT}
 		for i in $(seq 1 $TIMEOUT); do
-			sleep 1 & wait $!
 			test "$((STATE--))" -le "0" && STATE="0"
+			sleep 1 & wait $!
 			echo "$STATE" > "$STATEFILE"
 		done
 
@@ -64,7 +66,8 @@ case "$FUNCTION" in
 
 		;;
 	"state")
-		test -n "$STATE" && echo "$STATE" || echo "$TIMEOUT"
+		echo ${STATE:-$STATELIMIT}
+		#TODO: return empty string if valve not configured
 
 		;;
 	*)
