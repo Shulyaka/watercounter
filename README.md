@@ -27,7 +27,7 @@ Collectd integration:
 ```
 LoadPlugin exec
 <Plugin exec>
-        Exec "nobody:nogroup" "/bin/watercounter"
+        Exec "nobody:nogroup" "/usr/bin/watercounter"
 </Plugin>
 ```
 2. Make sure `nobody` user can read __and__ write `/etc/watercounter/counter_*`:
