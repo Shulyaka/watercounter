@@ -22,6 +22,11 @@ Installation:
 3. Copy `bin/counter` and `bin/valve` CLI scripts to your device and make them executable
 4. Copy the contents of www/ directory to the root directory of your web server
 
+Configuration:
+1. Create a configuration file with the following format: `/etc/watercounter/counter{GPIO}_{CLASS}_{NAME}`
+GPIO is the gpio number, CLASS is either "hot" or "cold" (only affects a background picture) and the NAME is any name you want.
+2. Optionally create a shortcut shell scripts that invoke `/bin/counter` and `/bin/valve` with the appropriate arguments. See `bin/cold`, `bin/hot` and `bin/toilet` for examples.
+
 Collectd integration:
 1. Add the following to your /etc/collectd.conf:
 ```
@@ -34,10 +39,7 @@ LoadPlugin exec
 ```
 chown nobody:nogroup /etc/watercounter/counter*
 ```
-3. Make sure `nobody` user can read and write /sys/kernel/debug. This is required to access gpios. For example, add the following
+3. Make sure `nobody` user can read and write /sys/kernel/debug. This is required to access gpios. For example, add the following line to the `/etc/init.d/collectd` script in the `start()` function:
+```
 chmod go+rwx /sys/kernel/debug
-
-Configuration:
-1. Create a configuration file with the following format: `/etc/watercounter/counter{GPIO}_{CLASS}_{NAME}`
-GPIO is the gpio number, CLASS is either "hot" or "cold" (only affects a background picture) and the NAME is any name you want.
-2. Optionally create a shortcut shell scripts that invoke `/bin/counter` and `/bin/valve` with the appropriate arguments. See `bin/cold`, `bin/hot` and `bin/toilet` for examples.
+```
