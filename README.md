@@ -32,7 +32,7 @@ LoadPlugin exec
 ```
 2. Make sure `nobody` user can read __and__ write `/etc/watercounter/counter_*`:
 ```
-chown nobody:nobody /etc/watercounter/counter_*
+chown nobody:nogroup /etc/watercounter/counter*
 ```
 3. Make sure `nobody` user can read and write /sys/kernel/debug. This is required to access gpios. For example, add the following
 chmod go+rwx /sys/kernel/debug
