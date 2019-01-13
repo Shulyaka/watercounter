@@ -34,7 +34,6 @@ struct counter
 {
 	int gpio;
 	unsigned long value; //litres
-	enum state state;
 	time_t timestamp; //last state change
 	char filename[PATH_MAX];
 	char name[NAME_MAX];
@@ -116,8 +115,6 @@ void counter_update(int gpio, enum state val)
 		fprintf(stderr, " time: %ld, bypass: %d\n", curtime-counter[i].timestamp, counter[i].thresholdbypass);
 		fflush(stderr);
 	}
-
-	counter[i].state=val;
 
 	if(val==hi)
 	{
@@ -302,13 +299,6 @@ void counter_init(const char *dirp)
 		fclose(file);
 
 		free(namelist[i]);
-
-		lastdigit=counter[i].value-counter[i].value/10*10;
-
-		if(lastdigit > 1 && lastdigit < 8)
-			counter[i].state=lo;
-		else
-			counter[i].state=hi;
 	}
 
 	free(namelist);
@@ -321,7 +311,7 @@ void counter_print(void)
 	fprintf(stderr, "Current counters:\n");
 
 	for(i=0; i<numcounter; i++)
-		fprintf(stderr, "Index: %d, gpio: %d, name: %s, value: %lu, state: %d, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].name, counter[i].value, counter[i].state, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
+		fprintf(stderr, "Index: %d, gpio: %d, name: %s, value: %lu, bypass: %d, timestamp: %ld, filename: %s\n", i, counter[i].gpio, counter[i].name, counter[i].value, counter[i].thresholdbypass, counter[i].timestamp, counter[i].filename);
 	fflush(stderr);
 }
 
