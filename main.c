@@ -24,12 +24,6 @@
 int debug=1;
 int lesswrites=1;
 
-enum state
-{
-	lo=0,
-	hi=1
-};
-
 struct counter
 {
 	int gpio;
@@ -92,7 +86,7 @@ void counter_free(void)
 			counter_save(i, curtime, 1);
 }
 
-void counter_update(int gpio, enum state val)
+void counter_update(int gpio, int val)
 {
 	int i;
 	time_t curtime=time(NULL);
@@ -116,41 +110,46 @@ void counter_update(int gpio, enum state val)
 		fflush(stderr);
 	}
 
-	if(val==hi)
+	switch(val)
 	{
-		if(curtime-counter[i].timestamp>=THRESHOLDLOHI || counter[i].thresholdbypass)
-		{
-			if(counter[i].thresholdbypass==0)
+		case 1: //lo-hi change
+			if(curtime-counter[i].timestamp>=THRESHOLDLOHI || counter[i].thresholdbypass)
 			{
-				lastdigit=counter[i].value-counter[i].value/10*10;
-				if(lastdigit < 7)
+				if(counter[i].thresholdbypass==0)
 				{
-					counter[i].value+=7-lastdigit;
-					counter_save(i, curtime, !lesswrites);
+					lastdigit=counter[i].value-counter[i].value/10*10;
+					if(lastdigit < 7) //allow unaligned initial value
+					{
+						counter[i].value+=7-lastdigit;
+						counter_save(i, curtime, !lesswrites);
+					}
 				}
+				counter[i].thresholdbypass=0;
 			}
-			counter[i].thresholdbypass=0;
-		}
-		else	//ignoring event because of rate limit, the water could not flow that fast; it is a way to filter out the chatter
-			counter[i].thresholdbypass=1;		//ignore the threshold next time as we had already waited enough previously
-	}
-	else
-	{
-		if(curtime-counter[i].timestamp>=THRESHOLDHILO || counter[i].thresholdbypass)
-		{
-			if(counter[i].thresholdbypass==0)
+			else	//ignoring event because of rate limit, the water could not flow that fast; it is a way to filter out the chatter
+				counter[i].thresholdbypass=1;		//ignore the threshold next time as we had already waited enough previously
+			break;
+		case 0: //hi-lo change
+			if(curtime-counter[i].timestamp>=THRESHOLDHILO || counter[i].thresholdbypass)
 			{
-				lastdigit=counter[i].value-counter[i].value/10*10;
-				if(lastdigit >= 7)
+				if(counter[i].thresholdbypass==0)
 				{
-					counter[i].value+=10-lastdigit;
-					counter_save(i, curtime, !lesswrites);
+					lastdigit=counter[i].value-counter[i].value/10*10;
+					if(lastdigit >= 7)
+					{
+						counter[i].value+=10-lastdigit;
+						counter_save(i, curtime, !lesswrites);
+					}
 				}
+				counter[i].thresholdbypass=0;
 			}
+			else
+				counter[i].thresholdbypass=1;
+			break;
+		default:
+			counter[i].value=val;
+			counter_save(i, curtime, !lesswrites);
 			counter[i].thresholdbypass=0;
-		}
-		else
-			counter[i].thresholdbypass=1;
 	}
 
 	counter[i].timestamp=curtime;
@@ -158,7 +157,7 @@ void counter_update(int gpio, enum state val)
 
 void irq_handler(int n, siginfo_t *info, void *unused)
 {
-	counter_update(info->si_int >> 24, info->si_int & 1);
+	counter_update(info->si_int >> 24, info->si_int & 0x0FFF);
 }
 
 void gpio_init(void)
