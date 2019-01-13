@@ -97,6 +97,7 @@ void counter_update(int gpio, enum state val)
 {
 	int i;
 	time_t curtime=time(NULL);
+	unsigned char lastdigit;
 
 	if(debug)
 		fprintf(stderr, "gpio: %d, state: %d", gpio, val);
@@ -124,8 +125,12 @@ void counter_update(int gpio, enum state val)
 		{
 			if(counter[i].thresholdbypass==0)
 			{
-				counter[i].value+=7;
-				counter_save(i, curtime, !lesswrites);
+				lastdigit=counter[i].value-counter[i].value/10*10;
+				if(lastdigit < 7)
+				{
+					counter[i].value+=7-lastdigit;
+					counter_save(i, curtime, !lesswrites);
+				}
 			}
 			counter[i].thresholdbypass=0;
 		}
@@ -138,8 +143,12 @@ void counter_update(int gpio, enum state val)
 		{
 			if(counter[i].thresholdbypass==0)
 			{
-				counter[i].value+=3;
-				counter_save(i, curtime, !lesswrites);
+				lastdigit=counter[i].value-counter[i].value/10*10;
+				if(lastdigit >= 7)
+				{
+					counter[i].value+=10-lastdigit;
+					counter_save(i, curtime, !lesswrites);
+				}
 			}
 			counter[i].thresholdbypass=0;
 		}
