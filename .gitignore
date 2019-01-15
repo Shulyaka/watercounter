@@ -1,2 +1,3 @@
 *.o
 watercounter
+openwrt/git-src
