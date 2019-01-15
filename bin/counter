@@ -7,7 +7,7 @@ shift 2
 RRDDIR="/tmp/rrd/$(uname -n)/exec-watercounter"
 
 case "$FUNCTION" in
-	counter)
+	get)
 		if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
 			VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
 		fi

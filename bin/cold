@@ -5,13 +5,13 @@ CGPIO=24
 VGPIO=17 16
 
 case "$1" in
-	counter)
+	get)
 		counter $NAME $@
 		;;
 	set)
 		counter $CGPIO $@
 		;;
-	open|close)
+	open|close|abort|state)
 		valve $VGPIO $@
 		;;
 	*)

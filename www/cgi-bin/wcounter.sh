@@ -16,7 +16,7 @@ for COUNTER in /etc/watercounter/counter*; do
 
 	NAME="${COUNTER%_*}"
 	SERIAL="${COUNTER##*_}"
-	VALUE="$(counter $COUNTER counter)"
+	VALUE="$(counter $COUNTER get)"
 	STATE="$(${COUNTER%_*} state)"
 
 	echo -n "{\"name\":\"$NAME\","

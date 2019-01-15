@@ -18,6 +18,9 @@ for ARG in $QUERY_STRING; do
 		function)
 			FUNCTION="$VAL"
 			;;
+		value)
+			VALUE="$VAL"
+			;;
 		_)
 			;;
 		*)
@@ -28,11 +31,14 @@ for ARG in $QUERY_STRING; do
 done
 
 case "$FUNCTION" in
-	open|close) ;;
+	open|close|abort) ;;
+	set)
+		FUNCTION="$FUNCTION $VALUE"
+		;;
 	*)
 		echo "{\"success\":0,\"error\":\"Unknown function\"}"
 		exit
-	;;
+		;;
 esac
 
 for COUNTER in /etc/watercounter/counter*; do
