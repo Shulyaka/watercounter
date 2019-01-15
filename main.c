@@ -314,8 +314,21 @@ void counter_print(void)
 	fflush(stderr);
 }
 
+int remote_update(pid_t pid, unsigned int gpio, unsigned int value)
+{
+	if(value<2)
+		value=2; //0 and 1 has a special meaning (gpio hi/lo)
+
+	union sigval sv={.sival_int=gpio<<24|value};
+
+	return sigqueue(pid, SIG_GPIO_IRQ, sv);
+}
+
 int main(int argc, char **argv)
 {
+	if(argc==4)
+		return remote_update((pid_t)atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
+
 	sigset_t sigset;
 	siginfo_t siginfo={0};
 

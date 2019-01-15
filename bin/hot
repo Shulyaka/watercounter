@@ -1,7 +1,20 @@
 #!/bin/sh
 
-if [ "$1" == "counter" ]; then
-	counter hot_16-046903 $@
-else
-	valve 15 13 $@
-fi
+NAME=hot_16-046903
+CGPIO=0
+VGPIO=5 13
+
+case "$1" in
+	counter)
+		counter $NAME $@
+		;;
+	set)
+		counter $CGPIO $@
+		;;
+	open|close)
+		valve $VGPIO $@
+		;;
+	*)
+		echo "$0: Unknown function $1" >&2
+		;;
+esac

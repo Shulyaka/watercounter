@@ -1,7 +1,20 @@
 #!/bin/sh
 
-if [ "$1" == "counter" ]; then
-	counter toilet_15-382336 $@
-else
-	valve 22 26 $@
-fi
+NAME=toilet_15-382336
+CGPIO=1
+VGPIO=22 26
+
+case "$1" in
+	counter)
+		counter $NAME $@
+		;;
+	set)
+		counter $CGPIO $@
+		;;
+	open|close)
+		valve $VGPIO $@
+		;;
+	*)
+		echo "$0: Unknown function $1" >&2
+		;;
+esac

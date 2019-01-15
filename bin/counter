@@ -7,7 +7,7 @@ shift 2
 RRDDIR="/tmp/rrd/$(uname -n)/exec-watercounter"
 
 case "$FUNCTION" in
-	"counter")
+	counter)
 		if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
 			VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
 		fi
@@ -18,6 +18,18 @@ case "$FUNCTION" in
 			echo "$VALUE1"
 		else
 			echo "$VALUE2"
+		fi
+
+		;;
+	set)
+		PID="$(pidof watercounter)"
+		VALUE="$1"
+
+		if [ -n "$PID" ]; then
+			#kill -s 42 -q $((($NAME<<24)+$VALUE)) "$PID"
+			watercounter "$PID" "$NAME" "$VALUE"
+		else
+			echo "$VALUE" > /etc/watercounter/counter${NAME}_*
 		fi
 
 		;;
