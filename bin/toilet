@@ -2,7 +2,7 @@
 
 NAME=toilet_15-382336
 CGPIO=1
-VGPIO=22 26
+VGPIO="22 26"
 
 case "$1" in
 	get)
