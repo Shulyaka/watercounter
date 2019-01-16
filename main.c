@@ -147,7 +147,7 @@ void counter_update(int gpio, int val)
 				counter[i].thresholdbypass=1;
 			break;
 		default:
-			counter[i].value=val;
+			counter[i].value+=val-2048;
 			counter_save(i, curtime, !lesswrites);
 			counter[i].thresholdbypass=0;
 	}
@@ -314,20 +314,36 @@ void counter_print(void)
 	fflush(stderr);
 }
 
-int remote_update(pid_t pid, unsigned long gpio, unsigned long value)
+int remote_update(pid_t pid, unsigned int gpio, long valuediff)
 {
-	if(value<2)
-		value=2; //0 and 1 has a special meaning (gpio hi/lo)
+	int ret;
+	int remainder=0;
 
-	union sigval sv={.sival_int=gpio<<24|value};
+	if(valuediff>2047)
+	{
+		remainder=valuediff-2047;
+		valuediff=2047;
+	}
+	else if(valuediff<-2046)
+	{
+		remainder=valuediff+2046;
+		valuediff=-2046;
+	}
 
-	return sigqueue(pid, SIG_GPIO_IRQ, sv);
+	union sigval sv={.sival_int=gpio<<24|(valuediff+2048)};
+
+	ret=sigqueue(pid, SIG_GPIO_IRQ, sv);
+
+	if(remainder)
+		ret=remote_update(pid, gpio, remainder);
+
+	return ret;
 }
 
 int main(int argc, char **argv)
 {
 	if(argc==4)
-		return remote_update((pid_t)atol(argv[1]), atol(argv[2]), atol(argv[3]));
+		return remote_update((pid_t)atoi(argv[1]), atoi(argv[2]), atol(argv[3]));
 
 	sigset_t sigset;
 	siginfo_t siginfo={0};

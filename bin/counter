@@ -23,13 +23,15 @@ case "$FUNCTION" in
 		;;
 	set)
 		PID="$(pidof watercounter)"
-		VALUE="$1"
+		VALUE=$(($1 - $($0 $NAME get)))
+		FILE="$(basename /etc/watercounter/counter*_${NAME})"
+		GPIO="${FILE#counter}"
+		GPIO="${GPIO%%_*}"
 
 		if [ -n "$PID" ]; then
-			#kill -s 42 -q $((($NAME<<24)+$VALUE)) "$PID"
-			watercounter "$PID" "$NAME" "$VALUE"
+			watercounter "$PID" "$GPIO" "$VALUE"
 		else
-			echo "$VALUE" > /etc/watercounter/counter${NAME}_*
+			echo "$VALUE" > "$FILE"
 		fi
 
 		;;

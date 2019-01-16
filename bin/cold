@@ -1,15 +1,11 @@
 #!/bin/sh
 
 NAME=cold_15-382321
-CGPIO=24
 VGPIO="17 16"
 
 case "$1" in
-	get)
+	get|set)
 		counter $NAME $@
-		;;
-	set)
-		counter $CGPIO $@
 		;;
 	open|close|abort|state)
 		valve $VGPIO $@

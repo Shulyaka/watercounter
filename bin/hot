@@ -1,15 +1,11 @@
 #!/bin/sh
 
 NAME=hot_16-046903
-CGPIO=0
 VGPIO="5 13"
 
 case "$1" in
-	get)
+	get|set)
 		counter $NAME $@
-		;;
-	set)
-		counter $CGPIO $@
 		;;
 	open|close|abort|state)
 		valve $VGPIO $@
