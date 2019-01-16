@@ -29,7 +29,9 @@ case "$FUNCTION" in
 		GPIO="${GPIO%%_*}"
 
 		if [ -n "$PID" ]; then
-			watercounter "$PID" "$GPIO" "$VALUE"
+			for P in $PID; do
+				watercounter "$P" "$GPIO" "$VALUE"
+			done
 		else
 			echo "$VALUE" > "$FILE"
 		fi
