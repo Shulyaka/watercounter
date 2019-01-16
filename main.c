@@ -340,7 +340,8 @@ int remote_update(pid_t pid, unsigned int gpio, long valuediff, int commit)
 	{
 		ret=remote_update(pid, gpio, remainder, 0);
 	}
-	else if(commit)
+
+	if(commit)
 	{
 		sv.sival_int=gpio<<24|2048;
 		ret=sigqueue(pid, SIG_GPIO_IRQ, sv);
