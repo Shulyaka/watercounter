@@ -470,7 +470,7 @@
 
 		if (counter[name].value_curr == 0)
 			setValue(name, value, 0);
-		else if (counter[name].value_next - counter[name].value_curr > 10 || counter[name].value_next - counter[name].value_curr == 1 || counter[name].value_next < counter[name].value_curr)
+		else if (counter[name].value_next - counter[name].value_curr > 10 || counter[name].value_next < counter[name].value_curr)
 			setValue(name, value - 1, 1);
 			//setValue(name, value, 4);
 		else
