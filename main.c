@@ -16,13 +16,13 @@
 #define GPIO_CHIP	0
 #define MAXCOUNTER	20
 
-#define THRESHOLDLOHI	4 //The threshold is the minimum time in seconds that could physically pass between the two states
-#define THRESHOLDHILO	2 //Everything below that limit is considered as chatter
+#define THRESHOLDLOHI	3 //The threshold is the minimum time in seconds that could physically pass between the two states
+#define THRESHOLDHILO	1 //Everything below that limit is considered as chatter
 
 #define CONFIGDIR "/etc/watercounter"
 
-int debug=1;
-int lesswrites=1;
+const int debug=1;
+const int lesswrites=1;
 
 struct counter
 {
@@ -146,9 +146,11 @@ void counter_update(int gpio, int val)
 			else
 				counter[i].thresholdbypass=1;
 			break;
+		case 2048: //commit update
+			counter_save(i, curtime, !lesswrites);
+			break;
 		default:
 			counter[i].value+=val-2048;
-			counter_save(i, curtime, !lesswrites);
 			counter[i].thresholdbypass=0;
 	}
 
@@ -314,7 +316,7 @@ void counter_print(void)
 	fflush(stderr);
 }
 
-int remote_update(pid_t pid, unsigned int gpio, long valuediff)
+int remote_update(pid_t pid, unsigned int gpio, long valuediff, int commit)
 {
 	int ret;
 	int remainder=0;
@@ -335,7 +337,14 @@ int remote_update(pid_t pid, unsigned int gpio, long valuediff)
 	ret=sigqueue(pid, SIG_GPIO_IRQ, sv);
 
 	if(remainder)
-		ret=remote_update(pid, gpio, remainder);
+	{
+		ret=remote_update(pid, gpio, remainder, 0);
+	}
+	else if(commit)
+	{
+		sv.sival_int=gpio<<24|2048;
+		ret=sigqueue(pid, SIG_GPIO_IRQ, sv);
+	}
 
 	return ret;
 }
@@ -343,7 +352,7 @@ int remote_update(pid_t pid, unsigned int gpio, long valuediff)
 int main(int argc, char **argv)
 {
 	if(argc==4)
-		return remote_update((pid_t)atoi(argv[1]), atoi(argv[2]), atol(argv[3]));
+		return remote_update((pid_t)atoi(argv[1]), atoi(argv[2]), atol(argv[3]), 1);
 
 	sigset_t sigset;
 	siginfo_t siginfo={0};

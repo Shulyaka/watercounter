@@ -23,17 +23,35 @@ case "$FUNCTION" in
 		;;
 	set)
 		PID="$(pidof watercounter)"
-		VALUE=$(($1 - $($0 $NAME get)))
 		FILE="$(basename /etc/watercounter/counter*_${NAME})"
 		GPIO="${FILE#counter}"
 		GPIO="${GPIO%%_*}"
+
+		if [ -z "$1" ]; then
+			echo "$0: New value required" >&2
+			exit 1
+		fi
+
+		if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
+			VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
+		fi
+
+		VALUE2="$(cat /etc/watercounter/counter*_${NAME})"
+
+		if [ -n "$VALUE1" -a "$VALUE1" != "UNKN" ]; then
+			VALUE=$(($1 - $VALUE1))
+		else
+			VALUE=$(($1 - $VALUE2))
+		fi
 
 		if [ -n "$PID" ]; then
 			for P in $PID; do
 				watercounter "$P" "$GPIO" "$VALUE"
 			done
-		else
-			echo "$VALUE" > "$FILE"
+		fi
+
+		if [ -z "$PID" -o "$1" -lt "$VALUE2" ]; then
+			echo "$1" > /etc/watercounter/"$FILE"
 		fi
 
 		;;
