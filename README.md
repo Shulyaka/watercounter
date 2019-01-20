@@ -15,6 +15,12 @@ Hardware setup:
 I use an `unwired one` board with openwrt-based os.
 counter: Just connect your counter with a wire to a free gpio port.
 valve: A valve needs 2 gpios: one for switching power on or off and another for controlling the direction (open or close). Those gpios should be connected to a relay controlling the actual valve.
+An example configuration is provided for 3 counters: "hot", "cold" and "toilet". Example GPIO used:
+| Name   | Input  | Valve power | Valve direction |
+|--------|--------|-------------|-----------------|
+| hot    | GPIO0  | GPIO15      | GPIO13          |
+| cold   | GPIO24 | GPIO17      | GPIO16          |
+| toilet | GPIO1  | GPIO22      | GPIO26          |
 
 Installation:
 1. Compile for your target arch and install the main `watercouner` binary
