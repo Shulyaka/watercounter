@@ -147,6 +147,19 @@
     color: rgba(0, 0, 0, 0.1);
     filter: blur(0.5px);
    }
+   .value_input {
+    position: relative;
+    z-index: 1;
+    top: 82px;
+    left: 76px;
+    width: 224px;
+    height: 57px;
+    font-size: 27px;
+    font-family: monospace;
+    letter-spacing: 13.6px;
+    text-align: right;
+    background: transparent;
+   }
    .stream {
     position: absolute;
     overflow: hidden;
@@ -326,6 +339,15 @@
 			counter[name].body_bottom.classList.add('counter_bottom_cold');
 		}
 
+		counter[name].value_input = document.createElement('input');
+		counter[name].value_input.setAttribute('type', 'text');
+		counter[name].value_input.classList.add('value_input');
+		counter[name].value_input.style.display = 'none';
+		counter[name].value_input.onchange = function () { acceptInput(name); };
+		counter[name].value_input.onblur = function () { hideInput(name); };
+		counter[name].body.ondblclick = function () { showInput(name); };
+		counter[name].body.appendChild(counter[name].value_input);
+
 		counter[name].value_next = 0;
 		counter[name].value_curr = 0;
 		counter[name].transition_running = 0;
@@ -472,7 +494,8 @@
 			setValue(name, value, 0);
 		else if (counter[name].value_next - counter[name].value_curr > 10 || counter[name].value_next < counter[name].value_curr)
 			setValue(name, value - 1, 1);
-			//setValue(name, value, 4);
+		else if (counter[name].value_next - counter[name].value_curr == 1)
+			setValue(name, value, 4);
 		else
 			setValue(name, counter[name].value_curr + 1, 1);
 	}
@@ -526,6 +549,39 @@
 		else
 			counter[name].lastaction = 1;
 		XHR.get('/cgi-bin/wcontrol.sh', { valve: name, function: counter[name].lastaction == 1 ? "open" : "close" }, checkResponse)
+	}
+
+	function showInput(name)
+	{
+		counter[name].value_input.value = ('00000000' + counter[name].value_next).substr(-8);
+		counter[name].value_input.style.display = '';
+		counter[name].value_input.focus();
+		for (var i=0; i<8; i++)
+		{
+			counter[name].digit[i].style.display = 'none';
+			counter[name].digit_prev[i].style.display = 'none';
+			counter[name].digit_next[i].style.display = 'none';
+		}
+	}
+
+	function hideInput(name)
+	{
+		counter[name].value_input.style.display = 'none';
+		for (var i=0; i<8; i++)
+		{
+			counter[name].digit[i].style.display = '';
+			counter[name].digit_prev[i].style.display = '';
+			counter[name].digit_next[i].style.display = '';
+		}
+	}
+
+	function acceptInput(name)
+	{
+		hideInput(name);
+		var value = parseInt(counter[name].value_input.value, 10);
+		counter[name].value_next = value;
+		XHR.get('/cgi-bin/wcontrol.sh', { valve: name, function: "set", value: value }, checkResponse)
+		setValue(name, value, 0);
 	}
 
 	XHR.poll(1, '/cgi-bin/wcounter.sh', { status: 1 },
