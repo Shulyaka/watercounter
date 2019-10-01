@@ -61,7 +61,8 @@ sensor:
   - platform: rest
     resource: http://watercounter/cgi-bin/wcounter.sh
     name: wcounter
-    value_template: 'OK'
+    value_template: 'Available'
+    device_class: signal_strength
     json_attributes: counters
   - platform: template
     sensors:
