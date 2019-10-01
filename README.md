@@ -1,6 +1,6 @@
 # watercounter
 
-A set of tools to manage water impulse counter
+A set of tools to manage water impulse counter and gpio valve
 
 Features:
 
