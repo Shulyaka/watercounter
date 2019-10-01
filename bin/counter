@@ -1,59 +1,216 @@
 #!/bin/sh
 
-NAME="$1"
-FUNCTION="$2"
-shift 2
+. /etc/watercounter/counters.sh
 
-RRDDIR="/tmp/rrd/$(uname -n)/exec-watercounter"
+case "$1" in
+	get|set|open|close|abort|state|lastaction|all)
+		get_gpio "$(basename "$0")"
+		;;
+	list)
+		;;
+	*)
+		NAME="$1"
+		shift
+		get_gpio "$NAME"
+		;;
+esac
+
+case "$2" in
+	open|close|abort|state|lastaction)
+		GPIO_CTRL="$NAME"
+		NAME=""
+		GPIO_STATE="$1"
+		shift
+		;;
+	*)
+		;;
+esac
+
+if [ "$3" == "all" ]; then
+	GPIO_CTRL="$1"
+	GPIO_STATE="$2"
+	shift 2
+fi
+
+FUNCTION="$1"
+shift
 
 case "$FUNCTION" in
-	get)
-		if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
-			VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
-		fi
-
-		VALUE2="$(cat /etc/watercounter/counter*_${NAME})"
-
-		if [ -n "$VALUE1" -a "$VALUE1" != "UNKN" -a "$VALUE1" -gt "$VALUE2" ]; then
-			echo "$VALUE1"
-		else
-			echo "$VALUE2"
-		fi
-
-		;;
-	set)
-		PID="$(pidof watercounter)"
-		FILE="$(basename /etc/watercounter/counter*_${NAME})"
-		GPIO="${FILE#counter}"
-		GPIO="${GPIO%%_*}"
-
-		if [ -z "$1" ]; then
-			echo "$0: New value required" >&2
+	get|set|all|list)
+		if [ -z "$NAME" -a "$FUNCTION" != "list" ]; then
+			echo "$0: Counter name not given" >&2
 			exit 1
 		fi
 
-		if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
-			VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
+		RRDDIR="/tmp/rrd/$(uname -n)/exec-watercounter"
+		;;
+esac
+
+case "$FUNCTION" in
+	open|close|abort|state|lastaction|all|list)
+		if [ \( -z "$GPIO_CTRL" -o -z "$GPIO_STATE" \) -a "$FUNCTION" != "list" ]; then
+			echo "$0: Valve GPIO not given" >&2
+			exit 1
 		fi
 
-		VALUE2="$(cat /etc/watercounter/counter*_${NAME})"
+		STATELIMIT=15
+		TIMEOUT=$(($STATELIMIT+1))
+		PIDFILE="/var/run/valve$GPIO_CTRL.pid"
+		STATEFILE="/tmp/valve$GPIO_CTRL.state"
+		LASTACTIONFILE="/tmp/valve$GPIO_CTRL.lastaction"
 
-		if [ -n "$VALUE1" -a "$VALUE1" != "UNKN" ]; then
-			VALUE=$(($1 - $VALUE1))
-		else
-			VALUE=$(($1 - $VALUE2))
-		fi
+		test -f "$STATEFILE" && STATE=$(cat "$STATEFILE")
+		test -f "$LASTACTIONFILE" && LASTACTION=$(cat "$LASTACTIONFILE")
+		;;
+esac
 
-		if [ -n "$PID" ]; then
-			for P in $PID; do
-				watercounter "$P" "$GPIO" "$VALUE"
-			done
-		fi
+_get() {
+	if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
+		VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
+	fi
 
-		if [ -z "$PID" -o "$1" -lt "$VALUE2" ]; then
-			echo "$1" > /etc/watercounter/"$FILE"
-		fi
+	VALUE2="$(cat /etc/watercounter/counter*_${NAME})"
 
+	if [ -n "$VALUE1" -a "$VALUE1" != "UNKN" -a "0$VALUE1" -gt "$VALUE2" ]; then
+		echo "$VALUE1"
+	else
+		echo "$VALUE2"
+	fi
+}
+
+_set() {
+	NEWVALUE="$1"
+
+	PID="$(pidof watercounter)"
+	FILE="$(basename /etc/watercounter/counter*_${NAME})"
+	GPIO="${FILE#counter}"
+	GPIO="${GPIO%%_*}"
+
+	if [ -z "$NEWVALUE" ]; then
+		echo "$0: New value required" >&2
+		exit 1
+	fi
+
+	if [ -f "$RRDDIR/counter-${NAME}.rrd" ]; then
+		VALUE1="$(rrdtool info "$RRDDIR/counter-${NAME}.rrd" |grep last_ds | sed -e 's/^.*last_ds = "\(.*\)"/\1/')"
+	fi
+
+	VALUE2="$(cat /etc/watercounter/counter*_${NAME})"
+
+	if [ -n "$VALUE1" -a "$VALUE1" != "UNKN" ]; then
+		VALUE=$(($NEWVALUE - $VALUE1))
+	else
+		VALUE=$(($NEWVALUE - $VALUE2))
+	fi
+
+	if [ -n "$PID" ]; then
+		for P in $PID; do
+			watercounter "$P" "$GPIO" "$VALUE"
+		done
+	fi
+
+	if [ -z "$PID" -o "$NEWVALUE" -lt "$VALUE2" ]; then
+		echo "$1" > /etc/watercounter/"$FILE"
+	fi
+
+	echo "set"
+}
+
+cleanup() {
+	STATUS=$?
+        trap '' SIGINT SIGHUP SIGQUIT SIGTERM EXIT
+
+	echo "0" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+	test -f "$PIDFILE" -a "$(cat "$PIDFILE")" == "$$" && rm "$PIDFILE"
+
+        exit $STATUS
+}
+
+init() {
+	test -f "$PIDFILE" && kill "$(cat "$PIDFILE")"
+
+	trap cleanup SIGINT SIGHUP SIGQUIT SIGTERM EXIT
+
+	echo "$$" > "$PIDFILE"
+
+	test ! -d "/sys/class/gpio/gpio$GPIO_CTRL" && echo "$GPIO_CTRL" > /sys/class/gpio/export
+	test ! -d "/sys/class/gpio/gpio$GPIO_STATE" && echo "$GPIO_STATE" > /sys/class/gpio/export
+
+	echo "out" > "/sys/class/gpio/gpio$GPIO_CTRL/direction"
+	echo "out" > "/sys/class/gpio/gpio$GPIO_STATE/direction"
+}
+
+_open() {
+	echo "open" | tee "$LASTACTIONFILE"
+	init
+	echo "0" > "/sys/class/gpio/gpio$GPIO_STATE/value"
+	echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+	: ${STATE:=0}
+	for i in $(seq 1 $TIMEOUT); do
+		test "$((STATE++))" -ge "$STATELIMIT" && STATE="$STATELIMIT"
+		sleep 1 & wait $!
+		echo "$STATE" > "$STATEFILE"
+	done
+}
+
+_close() {
+	echo "close" | tee "$LASTACTIONFILE"
+	init
+	echo "1" > "/sys/class/gpio/gpio$GPIO_STATE/value"
+	echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+	: ${STATE:=$TIMEOUT}
+	for i in $(seq 1 $TIMEOUT); do
+		test "$((STATE--))" -le "0" && STATE="0"
+		sleep 1 & wait $!
+		echo "$STATE" > "$STATEFILE"
+	done
+}
+
+_abort() {
+	init
+	echo "abort"
+}
+
+_state() {
+	echo ${STATE:-$STATELIMIT}
+	#TODO: return empty string if valve not configured
+}
+
+_lastaction() {
+	echo "${LASTACTION:-open}"
+}
+
+_all() {
+	_get
+	_state
+	_lastaction
+}
+
+_list() {
+	for COUNTER in /etc/watercounter/counter[0-9]*; do
+		COUNTER="$(basename "$COUNTER")"
+		test "${COUNTER%%-opkg}" == "$COUNTER" || continue
+		COUNTER="${COUNTER#counter*_}"
+
+		SHORTNAME="${COUNTER%_*}"
+		SERIAL="${COUNTER##*_}"
+		get_gpio "$SHORTNAME"
+
+		STATEFILE="/tmp/valve$GPIO_CTRL.state"
+		test -f "$STATEFILE" && STATE=$(cat "$STATEFILE") || STATE="$STATELIMIT"
+
+		LASTACTIONFILE="/tmp/valve$GPIO_CTRL.lastaction"
+		test -f "$LASTACTIONFILE" && LASTACTION=$(cat "$LASTACTIONFILE")
+
+		VALUE="$(_get)"
+
+		echo $SHORTNAME $SERIAL ${VALUE:-null} ${STATE:-null} ${LASTACTION:-null}
+	done
+}
+
+case "$FUNCTION" in
+	get|set|open|close|abort|state|lastaction|all|list)
+		_$FUNCTION $@
 		;;
 	*)
 		echo "$0: Unknown function $FUNCTION" >&2

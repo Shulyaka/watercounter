@@ -7,8 +7,11 @@ echo "Expires: 0"
 echo ""
 
 QUERY_STRING="${QUERY_STRING//&/ }"
+DATA="$(cat|sed -e 's/.*{//' -e 's/}.*//' -e 's/\"//g' -e 's/ *: */=/g' -e 's/ *, */ /g')"
 
-for ARG in $QUERY_STRING; do
+FUNCTION="lastaction"
+
+for ARG in $QUERY_STRING $DATA; do
 	PAR="${ARG%%=*}"  #What the f#*=k is %%=*?
 	VAL="${ARG#*=}"
 	case "$PAR" in
@@ -31,7 +34,7 @@ for ARG in $QUERY_STRING; do
 done
 
 case "$FUNCTION" in
-	open|close|abort) ;;
+	open|close|abort|lastaction) ;;
 	set)
 		FUNCTION="$FUNCTION $VALUE"
 		;;
@@ -49,9 +52,9 @@ for COUNTER in /etc/watercounter/counter*; do
 	NAME="${COUNTER%_*}"
 	test "$NAME" == "$VALVE" || continue
 
-	$VALVE $FUNCTION
+	LASTACTION=$($VALVE $FUNCTION)
 
-	echo "{\"success\":1}"
+	echo "{\"success\":1,\"lastaction\":\"$LASTACTION\"}"
 	exit
 done
 

@@ -26,12 +26,13 @@ Installation:
 1. Compile for your target arch and install the main `watercouner` binary
 2. Make sure the binary is always running. Optionally do it with collectd (see below). If you are not using collectd, I please set lesswrites to 0 in `main.c`.
 3. Copy `bin/counter` and `bin/valve` CLI scripts to your device and make them executable
-4. Copy the contents of www/ directory to the root directory of your web server
+4. Copy `/etc/watercounter/counters.sh` and set the parameters with your GPIO pins
+5. Copy the contents of www/ directory to the root directory of your web server
 
 Configuration:
 1. Create a configuration file with the following format: `/etc/watercounter/counter{GPIO}_{CLASS}_{NAME}`
-GPIO is the gpio number, CLASS is either "hot" or "cold" (only affects a background picture) and the NAME is any name you want.
-2. Optionally create a shortcut shell scripts that invoke `/bin/counter` and `/bin/valve` with the appropriate arguments. See `bin/cold`, `bin/hot` and `bin/toilet` for examples.
+GPIO is the gpio number, CLASS is either "hot" or "cold" (only affects a background picture) and the NAME is any name you want
+2. Optionally create symbolic links to `/bin/counter` with the appropriate counter names, i.e. cold -> counter, hot -> counter, etc
 
 Collectd integration:
 1. Add the following to your /etc/collectd.conf:

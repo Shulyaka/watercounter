@@ -1,16 +1,1 @@
-#!/bin/sh
-
-NAME=cold_15-382321
-VGPIO="17 16"
-
-case "$1" in
-	get|set)
-		counter $NAME $@
-		;;
-	open|close|abort|state)
-		valve $VGPIO $@
-		;;
-	*)
-		echo "$0: Unknown function $1" >&2
-		;;
-esac
+counter

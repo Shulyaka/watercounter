@@ -29,6 +29,7 @@ define Package/watercounter/conffiles
 /etc/watercounter/counter0_hot_16-046903
 /etc/watercounter/counter1_toilet_15-382336
 /etc/watercounter/counter24_cold_15-382321
+/etc/watercounter/counters.sh
 endef
 
 define Package/watercounter/install
@@ -36,14 +37,15 @@ define Package/watercounter/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/watercounter $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/valve $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/counter $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/hot $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/cold $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/toilet $(1)/usr/bin/
+	ln -s $(PKG_BUILD_DIR)/bin/hot counter
+	ln -s $(PKG_BUILD_DIR)/bin/cold counter
+	ln -s $(PKG_BUILD_DIR)/bin/toilet counter
 	$(INSTALL_DIR) $(1)/etc/watercounter
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/statistics/rrdtool/definitions/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counter0_hot_16-046903 $(1)/etc/watercounter/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counter1_toilet_15-382336 $(1)/etc/watercounter/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counter24_cold_15-382321 $(1)/etc/watercounter/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counters.sh $(1)/etc/watercounter/
 	$(INSTALL_DATA) ./files/exec.lua $(1)/usr/lib/lua/luci/statistics/rrdtool/definitions/
 	$(INSTALL_DIR) $(1)/www
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/www/index.html $(1)/www/watercounter.html

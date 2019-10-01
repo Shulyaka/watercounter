@@ -1,16 +1,1 @@
-#!/bin/sh
-
-NAME=toilet_15-382336
-VGPIO="22 26"
-
-case "$1" in
-	get|set)
-		counter $NAME $@
-		;;
-	open|close|abort|state)
-		valve $VGPIO $@
-		;;
-	*)
-		echo "$0: Unknown function $1" >&2
-		;;
-esac
+counter
