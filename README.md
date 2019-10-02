@@ -70,7 +70,7 @@ sensor:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[0].name.capitalize()}} counter"
         entity_id: sensor.wcounter
         unit_of_measurement: 'm³'
-        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[0].value/100)}}"
+        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[0].value/1000)}}"
         attribute_templates:
           serial: "{{states.sensor.wcounter.attributes.counters[0].serial}}"
           state: "{{states.sensor.wcounter.attributes.counters[0].state*100/15|int}} %"
@@ -79,7 +79,7 @@ sensor:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[1].name.capitalize()}} counter"
         entity_id: sensor.wcounter
         unit_of_measurement: 'm³'
-        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[1].value/100)}}"
+        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[1].value/1000)}}"
         attribute_templates:
           serial: "{{states.sensor.wcounter.attributes.counters[1].serial}}"
           state: "{{states.sensor.wcounter.attributes.counters[1].state*100/15|int}} %"
@@ -88,7 +88,7 @@ sensor:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[2].name.capitalize()}} counter"
         entity_id: sensor.wcounter
         unit_of_measurement: 'm³'
-        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[2].value/100)}}"
+        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[2].value/1000)}}"
         attribute_templates:
           serial: "{{states.sensor.wcounter.attributes.counters[2].serial}}"
           state: "{{states.sensor.wcounter.attributes.counters[2].state*100/15|int}} %"
