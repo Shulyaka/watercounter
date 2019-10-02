@@ -73,7 +73,6 @@ sensor:
     sensors:
       counter_0:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[0].name.capitalize()}} counter"
-        entity_id: sensor.wcounter
         unit_of_measurement: 'm³'
         value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[0].value/1000)}}"
         attribute_templates:
@@ -82,7 +81,6 @@ sensor:
           lastaction: "{{states.sensor.wcounter.attributes.counters[0].lastaction}}"
       counter_1:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[1].name.capitalize()}} counter"
-        entity_id: sensor.wcounter
         unit_of_measurement: 'm³'
         value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[1].value/1000)}}"
         attribute_templates:
@@ -91,7 +89,6 @@ sensor:
           lastaction: "{{states.sensor.wcounter.attributes.counters[1].lastaction}}"
       counter_2:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[2].name.capitalize()}} counter"
-        entity_id: sensor.wcounter
         unit_of_measurement: 'm³'
         value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[2].value/1000)}}"
         attribute_templates:
@@ -119,3 +116,5 @@ switch:
     body_off: '{"function": "close"}'
     is_on_template: '{{ value_json.lastaction == "open" }}'
 ```
+
+Optionally copy `/etc/watercounter/actions.d/*/update_ha.sh` files and set HASS and TOKEN variables in them.

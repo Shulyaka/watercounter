@@ -111,6 +111,11 @@ _set() {
 
 	if [ -z "$PID" -o "$NEWVALUE" -lt "$VALUE2" ]; then
 		echo "$1" > /etc/watercounter/"$FILE"
+		if [ -d /etc/watercounter/actions.d/counter/ ]; then
+			for script in /etc/watercounter/actions.d/counter/*; do
+				test -x $script && $script $NAME $VALUE &
+			done
+		fi
 	fi
 
 	echo "set"
@@ -145,11 +150,21 @@ _open() {
 	init
 	echo "0" > "/sys/class/gpio/gpio$GPIO_STATE/value"
 	echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+	if [ -d /etc/watercounter/actions.d/valve/ ]; then
+		for script in /etc/watercounter/actions.d/valve/*; do
+			test -x $script && $script $NAME open &
+		done
+	fi
 	: ${STATE:=0}
 	for i in $(seq 1 $TIMEOUT); do
 		test "$((STATE++))" -ge "$STATELIMIT" && STATE="$STATELIMIT"
 		sleep 1 & wait $!
 		echo "$STATE" > "$STATEFILE"
+		if [ -d /etc/watercounter/actions.d/state/ ]; then
+			for script in /etc/watercounter/actions.d/state/*; do
+				test -x $script && $script $NAME $STATE &
+			done
+		fi
 	done
 }
 
@@ -158,11 +173,21 @@ _close() {
 	init
 	echo "1" > "/sys/class/gpio/gpio$GPIO_STATE/value"
 	echo "1" > "/sys/class/gpio/gpio$GPIO_CTRL/value"
+	if [ -d /etc/watercounter/actions.d/valve/ ]; then
+		for script in /etc/watercounter/actions.d/valve/*; do
+			test -x $script && $script $NAME close &
+		done
+	fi
 	: ${STATE:=$TIMEOUT}
 	for i in $(seq 1 $TIMEOUT); do
 		test "$((STATE--))" -le "0" && STATE="0"
 		sleep 1 & wait $!
 		echo "$STATE" > "$STATEFILE"
+		if [ -d /etc/watercounter/actions.d/state/ ]; then
+			for script in /etc/watercounter/actions.d/state/*; do
+				test -x $script && $script $NAME $STATE &
+			done
+		fi
 	done
 }
 

@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=watercounter
-PKG_VERSION:=0.0.2
-PKG_RELEASE:=6
+PKG_VERSION:=0.0.3
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
@@ -30,22 +30,31 @@ define Package/watercounter/conffiles
 /etc/watercounter/counter1_toilet_15-382336
 /etc/watercounter/counter24_cold_15-382321
 /etc/watercounter/counters.sh
+/etc/watercounter/actions.d/counter/update_ha.sh
+/etc/watercounter/actions.d/valve/update_ha.sh
+/etc/watercounter/actions.d/state/update_ha.sh
 endef
 
 define Package/watercounter/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/watercounter $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/valve $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/counter $(1)/usr/bin/
-	ln -s $(PKG_BUILD_DIR)/bin/hot counter
-	ln -s $(PKG_BUILD_DIR)/bin/cold counter
-	ln -s $(PKG_BUILD_DIR)/bin/toilet counter
+	$(LN) counter $(PKG_BUILD_DIR)/bin/hot
+	$(LN) counter $(PKG_BUILD_DIR)/bin/cold
+	$(LN) counter $(PKG_BUILD_DIR)/bin/toilet
 	$(INSTALL_DIR) $(1)/etc/watercounter
+	$(INSTALL_DIR) $(1)/etc/watercounter/actions.d
+	$(INSTALL_DIR) $(1)/etc/watercounter/actions.d/counter
+	$(INSTALL_DIR) $(1)/etc/watercounter/actions.d/valve
+	$(INSTALL_DIR) $(1)/etc/watercounter/actions.d/state
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/statistics/rrdtool/definitions/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counter0_hot_16-046903 $(1)/etc/watercounter/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counter1_toilet_15-382336 $(1)/etc/watercounter/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counter24_cold_15-382321 $(1)/etc/watercounter/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/etc/watercounter/counters.sh $(1)/etc/watercounter/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/etc/watercounter/actions.d/counter/update_ha.sh $(1)/etc/watercounter/actions.d/counter/update_ha.sh
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/etc/watercounter/actions.d/valve/update_ha.sh $(1)/etc/watercounter/actions.d/valve/update_ha.sh
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/etc/watercounter/actions.d/state/update_ha.sh $(1)/etc/watercounter/actions.d/state/update_ha.sh
 	$(INSTALL_DATA) ./files/exec.lua $(1)/usr/lib/lua/luci/statistics/rrdtool/definitions/
 	$(INSTALL_DIR) $(1)/www
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/www/index.html $(1)/www/watercounter.html

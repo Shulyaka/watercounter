@@ -38,6 +38,16 @@ struct counter
 int numcounter=0;
 int gpio_base;
 
+void run_scripts(int i)
+{
+	static char cmd[256+PATH_MAX]={'\0'};
+	snprintf(cmd, sizeof(cmd)-1, "test -d /etc/watercounter/actions.d/counter/ && for script in /etc/watercounter/actions.d/counter/*; do $script %s %lu ; done", counter[i].name, counter[i].value);
+	if(!fork()) //child
+	{
+		exit(system(cmd));
+	}
+}
+
 void counter_save(int i, time_t curtime, int writefile)
 {
 	FILE *file;
@@ -72,6 +82,8 @@ void counter_save(int i, time_t curtime, int writefile)
 	printf("PUTVAL %s/exec-watercounter/counter-%s interval=%ld %ld:%lu\n", hostname, counter[i].name, curtime-counter[i].lastsave, curtime, counter[i].value);
 	printf("PUTVAL %s/exec-watercounter/gauge-%s interval=%ld %ld:%.3f\n", hostname, counter[i].name, curtime-counter[i].lastsave, curtime, 0.001*counter[i].value);
 	fflush(stdout);
+
+	run_scripts(i);
 
 	counter[i].lastsave=curtime;
 }
@@ -363,6 +375,8 @@ int main(int argc, char **argv)
 		counter_print();
 
 	gpio_init();
+
+	signal(SIGCHLD, SIG_IGN);
 
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGINT);
