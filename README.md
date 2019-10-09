@@ -74,6 +74,7 @@ sensor:
       counter_0:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[0].name.capitalize()}} counter"
         unit_of_measurement: 'm³'
+        icon_template: mdi:speedometer
         value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[0].value/1000)}}"
         attribute_templates:
           serial: "{{states.sensor.wcounter.attributes.counters[0].serial}}"
@@ -82,6 +83,7 @@ sensor:
       counter_1:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[1].name.capitalize()}} counter"
         unit_of_measurement: 'm³'
+        icon_template: mdi:speedometer
         value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[1].value/1000)}}"
         attribute_templates:
           serial: "{{states.sensor.wcounter.attributes.counters[1].serial}}"
@@ -90,6 +92,7 @@ sensor:
       counter_2:
         friendly_name_template: "{{states.sensor.wcounter.attributes.counters[2].name.capitalize()}} counter"
         unit_of_measurement: 'm³'
+        icon_template: mdi:speedometer
         value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[2].value/1000)}}"
         attribute_templates:
           serial: "{{states.sensor.wcounter.attributes.counters[2].serial}}"
@@ -115,6 +118,15 @@ switch:
     body_on: '{"function": "open"}'
     body_off: '{"function": "close"}'
     is_on_template: '{{ value_json.lastaction == "open" }}'
+
+homeassistant:
+  customize:
+    switch.hot_water:
+      icon: mdi:pipe
+    switch.toilet_water:
+      icon: mdi:pipe
+    switch.cold_water:
+      icon: mdi:pipe
 ```
 
 Optionally copy `/etc/watercounter/actions.d/*/update_ha.sh` files and set HASS and TOKEN variables in them.
