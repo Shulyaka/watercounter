@@ -72,32 +72,35 @@ sensor:
   - platform: template
     sensors:
       counter_0:
-        friendly_name_template: "{{states.sensor.wcounter.attributes.counters[0].name.capitalize()}} counter"
+        friendly_name_template: "{{state_attr('sensor.wcounter', 'counters')[0].name.capitalize()}} counter"
         unit_of_measurement: 'm³'
         icon_template: mdi:speedometer
-        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[0].value/1000)}}"
+        value_template: "{{'%.3f'|format(state_attr('sensor.wcounter', 'counters')[0].value/1000)}}"
         attribute_templates:
-          serial: "{{states.sensor.wcounter.attributes.counters[0].serial}}"
-          state: "{{states.sensor.wcounter.attributes.counters[0].state*100/15|int}} %"
-          lastaction: "{{states.sensor.wcounter.attributes.counters[0].lastaction}}"
+          serial: "{{state_attr('sensor.wcounter', 'counters')[0].serial}}"
+          state: "{{'%d%%'|format(state_attr('sensor.wcounter', 'counters')[0].state*100/15)}}"
+          lastaction: "{{state_attr('sensor.wcounter', 'counters')[0].lastaction}}"
+          name: "{{state_attr('sensor.wcounter', 'counters')[0].name}}"
       counter_1:
-        friendly_name_template: "{{states.sensor.wcounter.attributes.counters[1].name.capitalize()}} counter"
+        friendly_name_template: "{{state_attr('sensor.wcounter', 'counters')[1].name.capitalize()}} counter"
         unit_of_measurement: 'm³'
         icon_template: mdi:speedometer
-        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[1].value/1000)}}"
+        value_template: "{{'%.3f'|format(state_attr('sensor.wcounter', 'counters')[1].value/1000)}}"
         attribute_templates:
-          serial: "{{states.sensor.wcounter.attributes.counters[1].serial}}"
-          state: "{{states.sensor.wcounter.attributes.counters[1].state*100/15|int}} %"
-          lastaction: "{{states.sensor.wcounter.attributes.counters[1].lastaction}}"
+          serial: "{{state_attr('sensor.wcounter', 'counters')[1].serial}}"
+          state: "{{'%d%%'|format(state_attr('sensor.wcounter', 'counters')[1].state*100/15)}}"
+          lastaction: "{{state_attr('sensor.wcounter', 'counters')[1].lastaction}}"
+          name: "{{state_attr('sensor.wcounter', 'counters')[1].name}}"
       counter_2:
-        friendly_name_template: "{{states.sensor.wcounter.attributes.counters[2].name.capitalize()}} counter"
+        friendly_name_template: "{{state_attr('sensor.wcounter', 'counters')[2].name.capitalize()}} counter"
         unit_of_measurement: 'm³'
         icon_template: mdi:speedometer
-        value_template: "{{'%.3f'|format(states.sensor.wcounter.attributes.counters[2].value/1000)}}"
+        value_template: "{{'%.3f'|format(state_attr('sensor.wcounter', 'counters')[2].value/1000)}}"
         attribute_templates:
-          serial: "{{states.sensor.wcounter.attributes.counters[2].serial}}"
-          state: "{{states.sensor.wcounter.attributes.counters[2].state*100/15|int}} %"
-          lastaction: "{{states.sensor.wcounter.attributes.counters[2].lastaction}}"
+          serial: "{{state_attr('sensor.wcounter', 'counters')[2].serial}}"
+          state: "{{'%d%%'|format(state_attr('sensor.wcounter', 'counters')[2].state*100/15)}}"
+          lastaction: "{{state_attr('sensor.wcounter', 'counters')[2].lastaction}}"
+          name: "{{state_attr('sensor.wcounter', 'counters')[2].name}}"
 
 switch:
   - platform: rest
@@ -118,6 +121,28 @@ switch:
     body_on: '{"function": "open"}'
     body_off: '{"function": "close"}'
     is_on_template: '{{ value_json.lastaction == "open" }}'
+
+rest_command:
+  set_counter:
+    url: "http://watercounter/cgi-bin/wcontrol.sh?function=set&valve={{name}}&value={{'%d'|format(value|float*1000)}}"
+
+automation:
+  alias: Revert counter
+  description: Prevent counter from decreasing
+  trigger:
+  - entity_id:
+    - sensor.counter_0
+    - sensor.counter_1
+    - sensor.counter_2
+    platform: state
+  condition:
+  - condition: template
+    value_template: '{{trigger.from_state.state > trigger.to_state.state}}'
+  action:
+  - service: rest_command.set_counter
+    data_template:
+      name: '{{trigger.from_state.attributes.name}}'
+      value: '{{trigger.from_state.state}}'
 
 homeassistant:
   customize:
