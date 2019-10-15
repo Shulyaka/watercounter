@@ -125,6 +125,8 @@ switch:
 rest_command:
   set_counter:
     url: "http://watercounter/cgi-bin/wcontrol.sh?function=set&valve={{name}}&value={{'%d'|format(value|float*1000)}}"
+  mos_ru_update:
+    url: "http://watercounter/cgi-bin/mos_ru_update.sh"
 
 automation:
   alias: Revert counter
